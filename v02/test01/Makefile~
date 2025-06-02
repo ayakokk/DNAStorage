@@ -1,0 +1,7 @@
+all: genIcodec
+
+genIcodec: genIcodec.cpp Makefile
+	g++ -Wall -O3 -o genIcodec genIcodec.cpp
+
+clean:
+	rm -f *.o genIcodec

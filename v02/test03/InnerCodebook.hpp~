@@ -1,0 +1,9 @@
+class InnerCodebook{
+private:
+  int N;     // block length
+  int numCW; // number of codewords
+  int **CW;  // [numCW][N]: codewords
+public:
+  InnerCodebook(const char *fn);
+  ~InnerCodebook();
+};

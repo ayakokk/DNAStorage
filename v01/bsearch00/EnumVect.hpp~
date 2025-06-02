@@ -1,0 +1,8 @@
+class EnumVect {
+private:
+  int N;   // vector length
+  int *NE; // [N] number of elements
+public:
+  EnumVect(int _N, const int *_NE);
+  ~EnumVect();
+};

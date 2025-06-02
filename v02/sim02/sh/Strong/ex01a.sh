@@ -1,0 +1,7 @@
+#!/bin/sh
+unbuffer ./sim ICB/ex01/ 50 0.004 0.004 0.004 0 4 3 2 1 > log/Strong/ex01a_004_Strong.log
+unbuffer ./sim ICB/ex01/ 50 0.005 0.005 0.005 0 4 3 2 1 > log/Strong/ex01a_005_Strong.log
+unbuffer ./sim ICB/ex01/ 50 0.006 0.006 0.006 0 4 3 2 1 > log/Strong/ex01a_006_Strong.log
+unbuffer ./sim ICB/ex01/ 50 0.007 0.007 0.007 0 4 3 2 1 > log/Strong/ex01a_007_Strong.log
+unbuffer ./sim ICB/ex01/ 50 0.008 0.008 0.008 0 4 3 2 1 > log/Strong/ex01a_008_Strong.log
+unbuffer ./sim ICB/ex01/ 50 0.009 0.009 0.009 0 4 3 2 1 > log/Strong/ex01a_009_Strong.log

@@ -1,0 +1,8 @@
+class MutualInfo {
+private:
+  int M, N;             // M-input N-output
+  unsigned long **cnt;  // [M][N]: count
+  unsigned long *cntX;  // [M]: X count
+  unsigned long *cntY;  // [N]: Y count
+public:
+};

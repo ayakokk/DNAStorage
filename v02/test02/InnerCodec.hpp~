@@ -1,0 +1,5 @@
+class InnerCodec {
+private:
+public:
+  InnerCodec(int _RunK, int _Delta, double _Pi, double _Pd, double _Ps, int _Dmin, int _Dmax);
+};

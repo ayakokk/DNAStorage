@@ -1,0 +1,76 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "func.hpp"
+#include "MutualInfo.hpp"
+#include "InnerCodebook.hpp"
+
+#define WCmax 100000
+
+//================================================================================
+int main(int argc, char *argv[]){
+  int Rho;         // run-length
+  int ell,Delta;   // local-balance
+  int N;           // block length (symbols)
+  int Nb;          // block length (bits)
+  int Q, Nu, Nu2p; // ICB
+  int seed;
+  char *fn;
+  if(argc!=7){
+    fprintf(stderr,"Usage: %s <ICB.txt> <Rho> <ell> <Delta> <N> <seed|-1>\n",argv[0]);
+    return 1;
+  } // if
+  fn    = argv[1];
+  Rho   = atoi(argv[2]);
+  ell   = atoi(argv[3]);
+  Delta = atoi(argv[4]);
+  N     = atoi(argv[5]);
+  seed  = atoi(argv[6]);
+  if(seed==-1) seed = (int)time(NULL);
+  srandom(seed);
+  class InnerCodebook *ICB = new class InnerCodebook(fn,Rho,ell,Delta);
+  Q    = ICB->Get_numCW();
+  Nu   = ICB->Get_Nu();
+  Nu2p = ICB->Get_Nu2p();
+  Nb   = N*Nu;
+  printf("# Q=%d Nu=%d(%d) Nb=%d\n",Q,Nu,Nu2p,Nb);
+  class MutualInfo *MI0 = new class MutualInfo(Q,Nu2p);
+  int *IV = new int [N];
+  unsigned char *CV = new unsigned char [Nb];
+
+  int wc;
+  //-----
+  for(wc=1;wc<=WCmax;wc++){
+    RandVect(IV,N,0,Q-1);
+    ICB->Encode(CV,IV,N);
+
+    // count
+    for(int i=0;i<N;i++){
+      if(i*Nu>=ell) MI0->countup(IV[i],(int)VectToLong(&CV[i*Nu],Nu));
+    } // for i
+
+    // print
+    if(wc%10000==0 || wc==WCmax-1){
+      printf("wc=%06d H(D)=%e H(D|X)=%e I(D;X)=%e\n",wc,MI0->Hx(),MI0->Hxy(),MI0->Ixy());
+    }
+    
+    //(dbg)
+    //printf("wc=%d\n",wc);
+    //MI0->PrintCnt();
+    //PrintVectX(IV,N, "IV\n","\n");
+    //PrintVectB(CV,Nb,"CV\n","\n");
+  }
+  //-----
+  //MI0->PrintCnt();
+  //printf("H(D)=%e H(D|X)=%e I(D;X)=%e\n",MI0->Hx(),MI0->Hxy(),MI0->Ixy());
+  
+  delete ICB;
+  delete MI0;
+  delete [] IV;
+  delete [] CV;
+  return 0;
+}

@@ -1,0 +1,61 @@
+# InnerCodebook: input ICB/ex01//cb.txt
+# InnerCodebook: Nu=6 Nu2p=64 numCW=18 FlgUnique=1 FlgInvertible=1 FlgBalanced=1
+# InnerCodebook: Rho=3 (ell,Delta)=(10,2) L0=2
+# InnerCodebook: Rst01=4 Rst10=13
+# CW
+# 000:001011 (2,L2,R2) WL:0 0 1 1 2 3  WR:3 3 3 2 2 1  
+# 001:001101 (2,L2,R1) WL:0 0 1 2 2 3  WR:3 3 3 2 1 1  
+# 002:001110 (3,L2,R1) WL:0 0 1 2 3 3  WR:3 3 3 2 1 0  
+# 003:010011 (2,L1,R2) WL:0 1 1 1 2 3  WR:3 3 2 2 2 1  
+# 004:010101 (1,L1,R1) WL:0 1 1 2 2 3  WR:3 3 2 2 1 1  
+# 005:010110 (2,L1,R1) WL:0 1 1 2 3 3  WR:3 3 2 2 1 0  
+# 006:011001 (2,L1,R1) WL:0 1 2 2 2 3  WR:3 3 2 1 1 1  
+# 007:011010 (2,L1,R1) WL:0 1 2 2 3 3  WR:3 3 2 1 1 0  
+# 008:011100 (3,L1,R2) WL:0 1 2 3 3 3  WR:3 3 2 1 0 0  
+# 009:100011 (3,L1,R2) WL:1 1 1 1 2 3  WR:3 2 2 2 2 1  
+# 010:100101 (2,L1,R1) WL:1 1 1 2 2 3  WR:3 2 2 2 1 1  
+# 011:100110 (2,L1,R1) WL:1 1 1 2 3 3  WR:3 2 2 2 1 0  
+# 012:101001 (2,L1,R1) WL:1 1 2 2 2 3  WR:3 2 2 1 1 1  
+# 013:101010 (1,L1,R1) WL:1 1 2 2 3 3  WR:3 2 2 1 1 0  
+# 014:101100 (2,L1,R2) WL:1 1 2 3 3 3  WR:3 2 2 1 0 0  
+# 015:110001 (3,L2,R1) WL:1 2 2 2 2 3  WR:3 2 1 1 1 1  
+# 016:110010 (2,L2,R1) WL:1 2 2 2 3 3  WR:3 2 1 1 1 0  
+# 017:110100 (2,L2,R2) WL:1 2 2 3 3 3  WR:3 2 1 1 0 0  
+# CWL
+# 000B:1 000D:1 000E:1 0013:1 0015:1 0016:1 0019:1 001A:1 001C:1 0023:1 
+# 0025:1 0026:1 0029:1 002A:1 002C:1 0031:1 0032:1 0034:1 
+# CWI
+# 000B:000 000D:001 000E:002 0013:003 0015:004 0016:005 0019:006 001A:007 001C:008 0023:009 
+# 0025:010 0026:011 0029:012 002A:013 002C:014 0031:015 0032:016 0034:017 
+# QA=18 Ns=50 Nu=6 Nb=300 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) Nseq=10 Ndi=1 OutListSize=10 [0]
+# ICB:   ICB/ex01//cb.txt
+# Const: ICB/ex01//constraint.txt
+# EncCM: ICB/ex01//EncCM.bin
+# ChannelMatrix: ICB/ex01//EncCM.bin (18x18)
+# CSFBAdec: Ns=50 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=300 Q=18 Nseq=10
+# CSFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# CSFBAdec: generating GD & GX
+# CSFBAdec: generating factor graph
+# CPScodec: Ns=50 Nu=6 Nb=300 Nseq=10
+# CPScodec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# CPScodec::SetCSL Kc=3 QB=8 QB2=4
+# CPScodec: Kc=3 QB=8 QB2=4
+# CPScodec::CSL
+#  [0] 00,03,00,00  01,02,00,00  02,01,00,00  03,00,00,00  
+#  [1] 00,00,00,03  00,00,01,02  00,00,02,01  00,00,03,00  
+# Kc=3 QB=8 QB2=4
+# CIDSchannel: N=300 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# CIDSchannel: Kc=3 Nseq=10
+# ChannelMatrix: M=18 N=180
+# ChannelMatrix: M=4 N=40
+# ConcatAB: (Nb,Nu,Ns)=(300,6,50) Nseq=10 (Qa,Qb)=(18,8) (Dmin,Dmax,Drng)=(0,0,1)
+9794 : 46730/489700=9.542577e-02 15 : 237729/2938200=8.090974e-02 43 : 4.169892e+00 3.401851e-01 3.829707e+00 : 1.999999e+00 2.955437e-01 1.704455e+00
+10000 : 47735/500000=9.547000e-02 15 : 242737/3000000=8.091233e-02 43 : 4.169894e+00 3.403298e-01 3.829564e+00 : 1.999999e+00 2.956269e-01 1.704372e+00
+# InnerCodebook: deleted
+# ChannelMatrix: deleted
+# CIDSchannel: deleted
+# CSFBAdec: deleted
+# CPScodec; deleted
+# ChannelMatrix: deleted
+# ChannelMatrix: deleted
+# ConcatAB: deleted

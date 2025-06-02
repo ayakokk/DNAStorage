@@ -1,0 +1,6 @@
+all: bmatrix.o GenBinCode
+
+bmatrix.o: bmatrix.cpp bmatrix.hpp Makefile
+	g++ -Wall -O3 -c -o bmatrix.o bmatrix.cpp
+
+

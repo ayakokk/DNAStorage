@@ -1,0 +1,6 @@
+#!/bin/sh
+
+if [ $# -ne 2 ]; then
+    echo "Usage: GenICB2.sh <in_dir> <out_dir>" 1>&2
+    exit 1
+fi

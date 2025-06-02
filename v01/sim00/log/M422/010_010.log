@@ -1,0 +1,29 @@
+# (Pid,Ps)=(1.000000e-02,1.000000e-02) Nseg=500 WinSize=10 [0]
+# InnerCB: ICB/marker/4_2_2.bin
+# Gtable:  Gtable/2/010_010.bin
+# InnerCodebook: beta=2(16) nu=3
+# InnerCodebook: B(B2p)=4(16) 4(16) 0(1) 
+# InnerCodebook: checked CWM, EncMap, DecMap
+# beta=2(16) N=1000 Dmax=15
+# NBIDSchannel: N=1000 Q=4 Dmax=15 (Pid,Ps)=(1.000000e-02,1.000000e-02)
+# FBalg4: Nseg=500 Dmax=15(w=31)
+# FBalg4: Gtable: Gtable/2/010_010.bin
+# Gtable: beta=2 (Pid,Ps,Ptrn)=(1.000000e-02,1.000000e-02,9.800000e-01) Pth=1.000000e-10
+# Gtable: beta4p=16 beta4pp=256
+# Gtable::Gtable len=0 cnt=16
+# Gtable::Gtable len=1 cnt=64
+# Gtable::Gtable len=2 cnt=256
+# Gtable::Gtable len=3 cnt=1024
+# Gtable::Gtable len=4 cnt=1072
+# FBalg4: beta=2(16) (Pid,Ps)=(1.000000e-02,1.000000e-02) Pth=1.000000e-10 N=1000
+2137(999) (3.85e-01 3.75e-01) XE:9.37e-02 (1.24e+00 1.26e+00 | 2.10e+00 2.03e+00)
+4320(1012) (2.48e-01 3.75e-01) XE:9.38e-02 (1.29e+00 1.26e+00 | 1.96e+00 2.03e+00)
+6504(1003) (3.79e-01 3.74e-01) XE:9.36e-02 (1.25e+00 1.26e+00 | 1.86e+00 2.03e+00)
+8686(999) (4.05e-01 3.75e-01) XE:9.36e-02 (1.28e+00 1.26e+00 | 2.13e+00 2.03e+00)
+10000(998) (3.16e-01 3.75e-01) XE:9.38e-02 (1.22e+00 1.26e+00 | 1.96e+00 2.03e+00)
+RL cnt: 0,6243100,1326828,272649,51712,13016,0,0,0,0,0,0,0,0,0,0,
+BL cnt: 0,0,19318,0,231640,0,1008009,0,2247887,0,2900597,0,2242726,0,1007320,0,232900,0,19603,0,0,
+# InnerCodebook: deleted
+# NBIDSchannel: deleted
+# Gtable: deleted
+# FBalg4: deleted

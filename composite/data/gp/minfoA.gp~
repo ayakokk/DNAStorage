@@ -1,0 +1,3 @@
+reset
+set grid
+plot "minfoA.dat" using 1:2 with linespoints

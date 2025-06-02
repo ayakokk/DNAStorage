@@ -1,0 +1,18 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "bmatrix.hpp"
+#include "func.hpp"
+
+//================================================================================
+int main(int argc, char *argv[]){
+  if(argc!=2){
+    fprintf(stderr,"Usage: %s <BinCB.bin>\n",argv[0]);
+    return 1;
+  }
+  return 0;
+}

@@ -1,0 +1,10 @@
+class IDSchannel {
+private:
+  int    N;          // block length
+  int    dmin,dmax;  // drift range
+  double Pi,Pd,Ps;   // error prob
+  //-----
+public:
+  IDSchannel(int _N, double _Pi, double _Pd, double _Ps);
+  ~IDSchannel();
+};

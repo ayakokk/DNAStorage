@@ -1,0 +1,206 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "func.hpp"
+#include "bmatrix.hpp"
+#include "CodeParam.hpp"
+
+int    Lr, Lb;
+int    beta, nu;
+int    wL, wH;
+int    *B,*WT;
+double eps;
+unsigned int beta2p, beta4p;
+unsigned int *B2p;
+class bmatrix *BCB;  // [beta2p][nu]
+int **WLmax;         // [nu][idx]: max weight: left
+int **WLmin;         // [nu][idx]: min weight: left
+int **WRmax;         // [nu][idx]: max weight: right
+int **WRmin;         // [nu][idx]: min weight: right
+
+void SetIntraConst();
+void SetInterConst();
+void SetWLR();
+
+void PrintWLR();
+void PrintBCB();
+
+//================================================================================
+int main(int argc, char *argv[]){
+  int  seed;
+  char *fn;
+  if(argc!=6){
+    fprintf(stderr,"%s <CodeParam.txt> <Lr> <Lb> <eps> <seed|-1>\n",argv[0]);
+    return 1;
+  } // if
+  fn  =      argv[1];
+  Lr  = atoi(argv[2]);
+  Lb  = atoi(argv[3]);
+  eps = atof(argv[4]);
+  seed= atoi(argv[5]);
+  if(seed==-1) seed = (int)time(NULL);
+  srandom(seed);
+  printf("# Lr=%d (Lb,eps)=(%d,%e) [%d]\n",Lr,Lb,eps,seed);
+  printf("# Code param: %s\n",fn);
+  assert(Lr>0 && Lb>1);
+  assert(eps>=0.0 && eps<=0.5);
+
+  // ----- init -----
+  class CodeParam *CP = new class CodeParam(fn);
+  beta= CP->get_beta();
+  nu  = CP->get_nu();
+  B   = new int [nu];
+  B2p = new unsigned int [nu];
+  CP->get_B(B);
+  beta2p = (unsigned int)pow(2,beta);
+  beta4p = (unsigned int)pow(4,beta);
+  for(int i=0;i<nu;i++) B2p[i] = (int)pow(2,B[i]);
+  wL = (int)ceil( Lb*(0.5-eps));
+  wH = (int)floor(Lb*(0.5+eps));
+  printf("# beta2p=%u beta4p=%u (wL,wH)=(%d,%d)\n",beta2p,beta4p,wL,wH);
+  PrintVect(B2p,nu,"# B2p: ","\n");
+  //-
+  BCB = new class bmatrix(beta2p,nu);
+  BCB->clear();
+  WT = new int [nu];
+  for(int i=0;i<nu;i++)
+    WT[i] = (i%2==0)? (int)floor((double)beta/2.0) : (int)ceil((double)beta/2.0);
+  PrintVect(WT,nu,"# WT:  ","\n");
+  //-
+  WLmax = new int * [nu];   // [nu][idx]: max weight: left
+  WLmin = new int * [nu];   // [nu][idx]: min weight: left
+  WRmax = new int * [nu];   // [nu][idx]: max weight: right
+  WRmin = new int * [nu];   // [nu][idx]: min weight: right
+  for(int i=0;i<nu;i++){
+    WLmax[i] = new int [beta];
+    WLmin[i] = new int [beta];
+    WRmax[i] = new int [beta];
+    WRmin[i] = new int [beta];
+  } // for i
+
+  // ----- set -----
+  SetIntraConst();   // (1) intra-word: RL LGCB sync01
+  SetInterConst();   // (2) inter-word: LGCB
+  //PrintBCB();
+
+  // ----- delete -----
+  delete CP;
+  delete BCB;
+  delete [] B;
+  delete [] B2p;
+  delete [] WT;
+  for(int i=0;i<nu;i++){
+    delete [] WLmax[i];
+    delete [] WLmin[i];
+    delete [] WRmax[i];
+    delete [] WRmin[i];
+  } // for i
+  delete [] WLmax;
+  delete [] WLmin;
+  delete [] WRmax;
+  delete [] WRmin;
+  return 0;
+}
+
+//================================================================================
+void SetIntraConst(){
+  int cb;
+  unsigned int u;
+  unsigned char *U = new unsigned char [beta];
+
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    if(U[0]!=0 || U[beta-1]!=1) continue;
+    if(MaxRunLength(U,beta)>Lr) continue;
+    for(cb=0;cb<nu;cb++){
+      if(HammingWeight(U,beta)==WT[cb]) BCB->setV(u,cb,1);
+    } // for cb
+    //(dbg)
+    //PrintVect2(U,beta,"","\n");
+  } // for u
+
+  delete [] U;
+}
+
+//================================================================================
+void SetInterConst(){
+  // ----- init 
+  SetWLR();
+  PrintWLR();
+  
+}
+
+//================================================================================
+void SetWLR(){
+  unsigned int u;
+  unsigned char *U = new unsigned char [beta];
+  int wl,wr;
+  
+  // ----- clear
+  for(int cb=0;cb<nu;cb++){
+    for(int i=0;i<beta;i++){
+      WLmax[cb][i] = 0;
+      WLmin[cb][i] = beta;
+      WRmax[cb][i] = 0;
+      WRmin[cb][i] = beta;
+    } // for i
+  } // for cb
+  
+  // ----- set
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    for(int idx=0;idx<beta;idx++){
+      wl = HammingWeight(U,idx+1);
+      wr = HammingWeight(&U[idx],beta-idx);
+      for(int cb=0;cb<nu;cb++){
+	if(BCB->getV(u,cb)==1){
+	  if(wl>WLmax[cb][idx]) WLmax[cb][idx] = wl;
+	  if(wl<WLmin[cb][idx]) WLmin[cb][idx] = wl;
+	  if(wr>WRmax[cb][idx]) WRmax[cb][idx] = wr;
+	  if(wr<WRmin[cb][idx]) WRmin[cb][idx] = wr;
+	} // if BCB
+      } // for cb
+    } // for idx
+  } // for u
+  delete [] U;
+}
+
+//================================================================================
+//================================================================================
+//================================================================================
+
+//================================================================================
+void PrintWLR(){
+  for(int cb=0;cb<nu;cb++){
+    printf("[cb=%d]\n",cb);
+    PrintVect(WLmax[cb],beta,"WLmax: ","\n");
+    PrintVect(WLmin[cb],beta,"WLmin: ","\n");
+    PrintVect(WRmax[cb],beta,"WRmax: ","\n");
+    PrintVect(WRmin[cb],beta,"WRmin: ","\n");
+  } // for cb
+}
+
+//================================================================================
+void PrintBCB(){
+  int cb;
+  unsigned int u;
+  unsigned char *U = new unsigned char [beta];
+  bool flg;
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    flg=false;
+    for(cb=0;cb<nu;cb++)
+      if(BCB->getV(u,cb)==1) flg=true;
+    PrintVect2(U,beta,""," ");
+    printf("(%02d) ",HammingWeight(U,beta));
+    for(cb=0;cb<nu;cb++) printf("%d",BCB->getV(u,cb));
+    if(flg) printf(" CW");
+    printf("\n");
+  } // for u  
+  delete [] U;
+}
+

@@ -1,0 +1,1 @@
+int binom(int n, int k);

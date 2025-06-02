@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ $# -ne 7 ]; then
+    echo "Usage: SimInner.sh <Pid> <Ps> <Nseg> <InnerICB.dir> <Gtable.bin> <lmd> <seed|-1>" 1>&2
+    exit 1
+fi
+
+echo "Input dir: $4"
+
+for ifile in `\find $4 -maxdepth 1 -type f`; do
+    echo "$1 $2 $3 $ifile $5 $6 $7"
+done

@@ -1,0 +1,9 @@
+class Gtable {
+private:
+  int    beta;
+  double Pid,Ps;
+  double Pth;
+public:
+  Gtable(int _beta, double _Pid, double _Ps, double _Pth);
+  ~Gtable();
+};

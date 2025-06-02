@@ -1,0 +1,7 @@
+all: GenCB00
+
+GenCB00: GenCB00.cpp Makefile
+	g++ -Wall -O3 -o GenCB00 GenCB00.cpp
+
+clean:
+	rm -f *.o GenCB00

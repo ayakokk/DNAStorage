@@ -1,0 +1,10 @@
+void PrintVect(const unsigned char *V, int len);
+void PrintVect4(const unsigned char *V, int len);
+void ConvIntVect(int u, unsigned char *V, int len); // unsigneg int -> 4-ary vector
+int  ConvVectInt(const unsigned char *V, int len);  // 4-ary vector -> unsigned int   
+int  SymbolCnt(const unsigned char *V, unsigned char val, int len);
+int  GCbalance(const unsigned char *V, int len);    // GC-balance wG + wC - wA- wT 
+int  MaxRunLength(const unsigned char *V, int len); // maximum run-length
+void RandomSel(class bmatrix *CW, int num, class bmatrix *F);  // select num elements from F=0 
+void Swap(int *a, int *b);
+int  HammingDist(const int *V0, const int *V1, int len);

@@ -1,0 +1,1 @@
+void GenRndVect(int *V, int mod, int len);

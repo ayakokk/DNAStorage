@@ -1,0 +1,7 @@
+all: GenICB
+
+GenICB: GenICB.cpp Makefile
+	g++ -Wall -O3 -o GenICB GenICB.cpp
+
+clean:
+	rm -f *.o GenICB

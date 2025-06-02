@@ -1,0 +1,1 @@
+void ConcatAB_AtoB(class CSFBAdec *DECa, class CPScodec *DECb);

@@ -1,0 +1,1951 @@
+# InnerCodebook: input ./ICB/ex01/cb.txt
+# InnerCodebook: Nu=6 Nu2p=64 numCW=18 FlgUnique=1 FlgInvertible=1 FlgBalanced=1
+# InnerCodebook: Rho=3 (ell,Delta)=(10,2) L0=2
+# InnerCodebook: Rst01=4 Rst10=13
+# CW
+# 000:001011 (2,L2,R2) WL:0 0 1 1 2 3  WR:3 3 3 2 2 1  
+# 001:001101 (2,L2,R1) WL:0 0 1 2 2 3  WR:3 3 3 2 1 1  
+# 002:001110 (3,L2,R1) WL:0 0 1 2 3 3  WR:3 3 3 2 1 0  
+# 003:010011 (2,L1,R2) WL:0 1 1 1 2 3  WR:3 3 2 2 2 1  
+# 004:010101 (1,L1,R1) WL:0 1 1 2 2 3  WR:3 3 2 2 1 1  
+# 005:010110 (2,L1,R1) WL:0 1 1 2 3 3  WR:3 3 2 2 1 0  
+# 006:011001 (2,L1,R1) WL:0 1 2 2 2 3  WR:3 3 2 1 1 1  
+# 007:011010 (2,L1,R1) WL:0 1 2 2 3 3  WR:3 3 2 1 1 0  
+# 008:011100 (3,L1,R2) WL:0 1 2 3 3 3  WR:3 3 2 1 0 0  
+# 009:100011 (3,L1,R2) WL:1 1 1 1 2 3  WR:3 2 2 2 2 1  
+# 010:100101 (2,L1,R1) WL:1 1 1 2 2 3  WR:3 2 2 2 1 1  
+# 011:100110 (2,L1,R1) WL:1 1 1 2 3 3  WR:3 2 2 2 1 0  
+# 012:101001 (2,L1,R1) WL:1 1 2 2 2 3  WR:3 2 2 1 1 1  
+# 013:101010 (1,L1,R1) WL:1 1 2 2 3 3  WR:3 2 2 1 1 0  
+# 014:101100 (2,L1,R2) WL:1 1 2 3 3 3  WR:3 2 2 1 0 0  
+# 015:110001 (3,L2,R1) WL:1 2 2 2 2 3  WR:3 2 1 1 1 1  
+# 016:110010 (2,L2,R1) WL:1 2 2 2 3 3  WR:3 2 1 1 1 0  
+# 017:110100 (2,L2,R2) WL:1 2 2 3 3 3  WR:3 2 1 1 0 0  
+# CWL
+# 000B:1 000D:1 000E:1 0013:1 0015:1 0016:1 0019:1 001A:1 001C:1 0023:1 
+# 0025:1 0026:1 0029:1 002A:1 002C:1 0031:1 0032:1 0034:1 
+# CWI
+# 000B:000 000D:001 000E:002 0013:003 0015:004 0016:005 0019:006 001A:007 001C:008 0023:009 
+# 0025:010 0026:011 0029:012 002A:013 002C:014 0031:015 0032:016 0034:017 
+# ========== Experiment Configuration ==========
+# Codebook: ./ICB/ex01/cb.txt
+# Q=18 N=100 Nu=6 Nb=600 seed=1
+# WCmax_EXP=20000
+# Weight configurations:
+#   uniform: [1,1,1,1] - Uniform (Random equivalent)
+#   light: [6,5,4,3] - Light weighting
+#   medium: [5,4,3,2] - Medium weighting
+#   strong: [4,3,2,1] - Strong weighting
+#   extreme: [10,6,3,1] - Extreme weighting
+#   light_reverce: [3,4,5,6] - Light_reverce weighting
+#   medium_reverce: [2,3,4,5] - Medium_reverce weighting
+#   strong_reverce: [1,2,3,4] - Strong_reverce weighting
+#   extreme_reverce: [1,3,6,10] - Extreme_reverce weighting
+# ===============================================
+
+# ChannelMatrix: ./ICB/ex01/EncCM.bin (18x18)
+# ========== IDS Channel Experiment ==========
+## Weight Config: uniform [1,1,1,1]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.826777	4.169917	0.343140	0.096684
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.746910	4.169921	0.423011	0.110576
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.664217	4.169922	0.505705	0.124963
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.579769	4.169918	0.590149	0.139852
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.488644	4.169919	0.681275	0.156054
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.393095	4.169915	0.776820	0.172490
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.296282	4.169921	0.873639	0.189500
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.196410	4.169918	0.973508	0.207015
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.094219	4.169919	1.075700	0.225446
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.988036	4.169918	1.181882	0.244381
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.878205	4.169921	1.291715	0.263848
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: light [6,5,4,3]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.746987	4.142600	0.395612	0.118707
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.666515	4.141964	0.475450	0.132493
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.587602	4.142265	0.554664	0.146051
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.505048	4.142315	0.637267	0.160247
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.418859	4.142357	0.723499	0.175222
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.331674	4.142262	0.810589	0.190685
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.237597	4.141971	0.904374	0.206511
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.141723	4.141827	1.000104	0.223656
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.050599	4.142239	1.091640	0.239207
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.945255	4.142544	1.197289	0.257912
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.841229	4.142223	1.300994	0.276492
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: medium [5,4,3,2]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.716917	4.124660	0.407743	0.125106
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.638627	4.124803	0.486176	0.138213
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.558731	4.124770	0.566039	0.151897
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.477090	4.124614	0.647524	0.165955
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.392651	4.125017	0.732366	0.180505
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.303359	4.124746	0.821387	0.195927
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.215741	4.124869	0.909128	0.211323
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.120637	4.124965	1.004328	0.227702
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.026345	4.125419	1.099074	0.243966
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.924989	4.124408	1.199419	0.262342
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.823130	4.124720	1.301591	0.279834
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: strong [4,3,2,1]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.656778	4.083266	0.426489	0.136348
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.579301	4.083306	0.504005	0.149127
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.500740	4.083061	0.582321	0.162506
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.420734	4.083640	0.662906	0.176177
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.338267	4.083161	0.744894	0.190096
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.254672	4.083128	0.828456	0.205244
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.166162	4.082892	0.916731	0.219787
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.075929	4.083566	1.007637	0.235646
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	2.980846	4.083395	1.102549	0.252356
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.882445	4.082582	1.200137	0.269402
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.779628	4.083125	1.303497	0.287484
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: extreme [10,6,3,1]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.512044	3.966436	0.454392	0.157049
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.438311	3.966450	0.528139	0.169233
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.364787	3.966719	0.601932	0.182060
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.287983	3.966863	0.678880	0.195341
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.212585	3.966897	0.754312	0.208399
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.132306	3.966999	0.834693	0.222201
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.046772	3.967316	0.920543	0.237131
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	2.962981	3.966956	1.003974	0.251359
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	2.875996	3.966815	1.090819	0.266715
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.784065	3.966793	1.182729	0.282297
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.691524	3.966361	1.274837	0.298379
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: light_reverce [3,4,5,6]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.857997	4.136363	0.278366	0.074178
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.776595	4.136218	0.359622	0.088422
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.693800	4.136536	0.442736	0.103418
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.602769	4.136682	0.533913	0.119748
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.510035	4.136753	0.626718	0.136452
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.409387	4.136611	0.727224	0.154423
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.305930	4.136340	0.830409	0.172728
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.201839	4.136331	0.934492	0.191998
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.092106	4.136435	1.044328	0.211674
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.983910	4.136391	1.152481	0.231626
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.863892	4.136462	1.272570	0.253230
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: medium_reverce [2,3,4,5]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.853415	4.112110	0.258695	0.067798
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.773751	4.112032	0.338281	0.081978
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.686339	4.112097	0.425757	0.097634
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.593433	4.111963	0.518530	0.114547
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.500824	4.112319	0.611495	0.131150
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.401226	4.112355	0.711129	0.149379
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.299247	4.112322	0.813075	0.167620
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.190832	4.112190	0.921358	0.187568
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.081390	4.111944	1.030555	0.207428
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.964641	4.112305	1.147664	0.229513
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.843664	4.112343	1.268679	0.251351
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: strong_reverce [1,2,3,4]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.825822	4.046400	0.220578	0.056036
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.744355	4.047083	0.302728	0.070914
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.658938	4.046222	0.387284	0.086333
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.565465	4.046793	0.481328	0.103709
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.465532	4.046106	0.580574	0.122133
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.364465	4.046205	0.681740	0.140660
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.255881	4.046515	0.790634	0.160809
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.144221	4.045935	0.901714	0.181454
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.034454	4.046617	1.012162	0.202274
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.911350	4.045745	1.134395	0.225268
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.791056	4.046613	1.255557	0.248448
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: extreme_reverce [1,3,6,10]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.710759	3.857717	0.146957	0.034715
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,1.000000e-03) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,1.000000e-03,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.631226	3.856776	0.225550	0.049483
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,2.000000e-03) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,2.000000e-03,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.544038	3.856712	0.312674	0.066495
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,3.000000e-03) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,3.000000e-03,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.446777	3.856388	0.409611	0.085292
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,4.000000e-03) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,4.000000e-03,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.347407	3.856970	0.509562	0.104152
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,5.000000e-03) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,5.000000e-03,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.234911	3.857064	0.622153	0.125651
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,6.000000e-03) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,6.000000e-03,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.117470	3.857257	0.739787	0.148646
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,7.000000e-03) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,7.000000e-03,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	2.999000	3.858379	0.859379	0.172163
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,8.000000e-03) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,8.000000e-03,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	2.887277	3.857666	0.970389	0.194089
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,9.000000e-03) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,9.000000e-03,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	2.765367	3.857837	1.092470	0.218201
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,1.000000e-02) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,1.000000e-02,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.636570	3.857889	1.221319	0.244013
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+
+# ========== ID Channel Experiment ==========
+## Weight Config: uniform [1,1,1,1]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.827350	4.169912	0.342562	0.096694
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.765107	4.169920	0.404813	0.106786
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.707459	4.169920	0.462461	0.116704
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.648030	4.169916	0.521886	0.127003
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.590843	4.169918	0.579075	0.137352
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.529620	4.169920	0.640300	0.148314
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.467846	4.169916	0.702070	0.159674
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.408004	4.169918	0.761914	0.170707
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.335399	4.169915	0.834516	0.183634
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.272158	4.169922	0.897764	0.195204
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	3.201834	4.169918	0.968084	0.207739
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: light [6,5,4,3]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.745053	4.142136	0.397083	0.119447
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.686632	4.142671	0.456040	0.127979
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.628137	4.141919	0.513783	0.138289
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.573209	4.142438	0.569229	0.147674
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.514860	4.142287	0.627427	0.158272
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.461096	4.142331	0.681235	0.167980
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.398891	4.142303	0.743413	0.179163
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.339768	4.142049	0.802280	0.189678
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.280281	4.142179	0.861897	0.200097
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.215473	4.142294	0.926821	0.212290
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	3.146296	4.142412	0.996117	0.224037
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: medium [5,4,3,2]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.716869	4.125193	0.408323	0.124945
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.656103	4.125281	0.469178	0.134464
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.598204	4.124776	0.526571	0.144319
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.543311	4.124652	0.581341	0.153901
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.490424	4.124879	0.634454	0.163426
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.433619	4.125136	0.691516	0.173619
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.373923	4.124928	0.751004	0.184369
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.316433	4.124501	0.808068	0.194766
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.257670	4.124990	0.867320	0.205164
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.191387	4.124794	0.933408	0.217010
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	3.131851	4.124794	0.992943	0.227260
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: strong [4,3,2,1]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.657732	4.083239	0.425508	0.135766
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.597453	4.083419	0.485966	0.145392
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.542556	4.084060	0.541505	0.154418
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.485937	4.083041	0.597104	0.164388
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.431019	4.082927	0.651908	0.174179
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.377359	4.083192	0.705834	0.183874
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.321788	4.083117	0.761329	0.194092
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.265584	4.083074	0.817491	0.204240
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.210254	4.083069	0.872814	0.213721
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.148079	4.082794	0.934715	0.224559
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	3.083653	4.082923	0.999270	0.236282
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: extreme [10,6,3,1]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.511345	3.966605	0.455260	0.157404
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.455044	3.966155	0.511111	0.165331
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.403571	3.967178	0.563607	0.174337
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.353342	3.967213	0.613872	0.183149
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.299996	3.966414	0.666418	0.192865
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.251001	3.967249	0.716248	0.201513
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.196274	3.966349	0.770075	0.211917
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.143372	3.966791	0.823419	0.221209
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.088597	3.966513	0.877916	0.231399
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.037567	3.966970	0.929403	0.240382
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	2.975410	3.965680	0.990269	0.251449
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: light_reverce [3,4,5,6]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.858130	4.136176	0.278046	0.074189
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.796741	4.135896	0.339155	0.083963
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.735493	4.136664	0.401171	0.095107
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.672911	4.136444	0.463533	0.106168
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.612635	4.136484	0.523849	0.117392
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.548360	4.136345	0.587985	0.129169
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.481700	4.136163	0.654463	0.141003
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.414739	4.136197	0.721459	0.153421
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.340601	4.136363	0.795762	0.167447
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.271151	4.136160	0.865009	0.179835
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	3.197034	4.136692	0.939658	0.193435
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: medium_reverce [2,3,4,5]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.854305	4.112385	0.258079	0.067679
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.792535	4.112259	0.319724	0.077840
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.731613	4.112023	0.380410	0.088368
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.669806	4.112454	0.442648	0.099835
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.607098	4.112052	0.504954	0.111301
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.541343	4.112514	0.571170	0.123450
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.475017	4.112297	0.637280	0.135649
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.406023	4.111909	0.705886	0.148522
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.331753	4.112394	0.780641	0.162517
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(9.000000e-03,9.000000e-03,0.000000e+00,9.820000e-01) (Dmin,Dmax:Drng)=(-11,11:23)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.009	3.259374	4.112200	0.852826	0.175544
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-02,1.000000e-02,0.000000e+00) (Dmin,Dmax)=(-12,12)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-02,1.000000e-02,0.000000e+00,9.800000e-01) (Dmin,Dmax:Drng)=(-12,12:25)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.010	3.181352	4.112706	0.931354	0.189889
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+
+## Weight Config: strong_reverce [1,2,3,4]
+# Error_Rate	Mutual_Info	Entropy_X	Entropy_XY	SER
+# IDSchannel: N=600 (Pi,Pd,Ps)=(0.000000e+00,0.000000e+00,0.000000e+00) (Dmin,Dmax)=(0,0)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);4,8) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(0.000000e+00,0.000000e+00,0.000000e+00,1.000000e+00) (Dmin,Dmax:Drng)=(0,0:1)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.000	3.826412	4.045959	0.219547	0.055761
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(1.000000e-03,1.000000e-03,0.000000e+00) (Dmin,Dmax)=(-2,2)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(1.000000e-03,1.000000e-03,0.000000e+00,9.980000e-01) (Dmin,Dmax:Drng)=(-2,2:5)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.001	3.762497	4.046286	0.283789	0.066529
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(2.000000e-03,2.000000e-03,0.000000e+00) (Dmin,Dmax)=(-3,3)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(2.000000e-03,2.000000e-03,0.000000e+00,9.960000e-01) (Dmin,Dmax:Drng)=(-3,3:7)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.002	3.701577	4.046508	0.344931	0.077535
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(3.000000e-03,3.000000e-03,0.000000e+00) (Dmin,Dmax)=(-4,4)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(3.000000e-03,3.000000e-03,0.000000e+00,9.940000e-01) (Dmin,Dmax:Drng)=(-4,4:9)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.003	3.639681	4.046180	0.406499	0.089118
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(4.000000e-03,4.000000e-03,0.000000e+00) (Dmin,Dmax)=(-5,5)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(4.000000e-03,4.000000e-03,0.000000e+00,9.920000e-01) (Dmin,Dmax:Drng)=(-5,5:11)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.004	3.570589	4.046082	0.475493	0.101837
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(5.000000e-03,5.000000e-03,0.000000e+00) (Dmin,Dmax)=(-6,6)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(5.000000e-03,5.000000e-03,0.000000e+00,9.900000e-01) (Dmin,Dmax:Drng)=(-6,6:13)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.005	3.508014	4.046635	0.538621	0.113763
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(6.000000e-03,6.000000e-03,0.000000e+00) (Dmin,Dmax)=(-8,8)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(6.000000e-03,6.000000e-03,0.000000e+00,9.880000e-01) (Dmin,Dmax:Drng)=(-8,8:17)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.006	3.434056	4.046620	0.612565	0.127605
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(7.000000e-03,7.000000e-03,0.000000e+00) (Dmin,Dmax)=(-9,9)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(7.000000e-03,7.000000e-03,0.000000e+00,9.860000e-01) (Dmin,Dmax:Drng)=(-9,9:19)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.007	3.363127	4.046420	0.683292	0.140914
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(8.000000e-03,8.000000e-03,0.000000e+00) (Dmin,Dmax)=(-10,10)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=18
+# SLFBAdec: (Pi,Pd,Ps,Pt)=(8.000000e-03,8.000000e-03,0.000000e+00,9.840000e-01) (Dmin,Dmax:Drng)=(-10,10:21)
+# SLFBAdec: generating GD & GX
+# SLFBAdec: generating factor graph
+# ChannelMatrix: M=18 N=5832
+0.008	3.288373	4.046916	0.758542	0.155008
+# IDSchannel: deleted
+# SLFBAdec: deleted
+# ChannelMatrix: deleted
+# IDSchannel: N=600 (Pi,Pd,Ps)=(9.000000e-03,9.000000e-03,0.000000e+00) (Dmin,Dmax)=(-11,11)
+# SLFBAdec: Ns=100 (Nu;Nu2min,Nu2max)=(6(64);3,9) Nb=600 Q=

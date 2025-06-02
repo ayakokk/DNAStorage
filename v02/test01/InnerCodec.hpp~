@@ -1,0 +1,7 @@
+class InnerCodec{
+private:
+  int ell, rlk, eps;
+public:
+  InnerCodec(int _ell, int _rlk, int _eps);
+  ~InnerCodec();
+};

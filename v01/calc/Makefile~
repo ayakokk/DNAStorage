@@ -1,0 +1,7 @@
+all: RunLenRnd
+
+RunLenRnd: RunLenRnd.cpp Makefile
+	g++ -Wall -O3 -o RunLenRnd RunLenRnd.cpp
+
+clean:
+	rm -f *.o RunLenRnd

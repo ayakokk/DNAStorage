@@ -1,0 +1,16 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "NBIDSchannel.hpp"
+#include "bmatrix.hpp"
+#include "func.hpp"
+#include "misc.hpp"
+
+
+//=================================================================================
+int main(int argc, char *argv[]){
+}

@@ -1,0 +1,9 @@
+class MetricCalc {
+private:
+  int    beta;
+  double Pid, Ps;
+  double Cid, Cerr, Cne;
+public:
+  MetricCalc(int _beta, double _Pid, double _Ps);
+  ~MetricCalc();
+};

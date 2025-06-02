@@ -1,0 +1,6 @@
+class NBIDSchannel{
+private:
+  int Q, Dmax;
+  
+public:
+};

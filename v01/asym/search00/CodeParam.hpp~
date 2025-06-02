@@ -1,0 +1,10 @@
+class CodeParam{
+private:
+  int beta,nu;
+  int *B;
+  int Lr, Lb;    // max run length / LGCB window size
+  double eps;    // LGCB [0.5-eps:0.5+eps] 
+public:
+  CodeParam(const char *fn);
+  ~CodeParam();
+};

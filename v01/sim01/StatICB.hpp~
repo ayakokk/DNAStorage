@@ -1,0 +1,8 @@
+class StatICB {
+private:
+  int NumTh;
+  int nu,beta4p;
+  int HdThNum;
+  double *HdThList;
+public:
+};

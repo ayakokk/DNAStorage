@@ -1,0 +1,7 @@
+all: ReadICB
+
+ReadICB: ReadICB.cpp Makefile
+	g++ -Wall -O3 -o ReadICB ReadICB.cpp
+
+clean:
+	rm -f ReadICB *.o

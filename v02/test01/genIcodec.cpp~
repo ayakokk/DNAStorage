@@ -1,0 +1,15 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+
+//================================================================================
+int main(int argc, char *argv[]){
+  if(argc!=4){
+    fprintf(stderr,"Usage: %s <ell> <k> <eps>\n",argv[0]);
+    return 1;
+  } //if
+  
+  return 0;
+}

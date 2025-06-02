@@ -1,0 +1,5 @@
+
+
+
+void RandVect(int *V, int len, int Vmin, int Vmax){
+}

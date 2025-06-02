@@ -1,0 +1,238 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "func.hpp"
+#include "bmatrix.hpp"
+#include "CodeParam.hpp"
+
+int    Lr, Lb;
+int    beta, nu;
+int    wL, wH;
+int    *B,*WT;
+double eps;
+unsigned int beta2p, beta4p;
+unsigned int *B2p;
+class bmatrix *BCB;  // [beta2p][nu]
+
+void SetIntraConst();
+void SetInterConst();
+void SetInterConstWTLRinit(int ***WTL, int ***WTR);
+void SetInterConstCNT(int **CNT);
+int  CalcWeightL(const unsigned char *U, int cb, int pos);
+
+void PrintBCB();
+void PrintWTLR(const int ***WTL, const int ***WTR);
+
+//================================================================================
+int main(int argc, char *argv[]){
+  int  seed;
+  char *fn;
+  if(argc!=6){
+    fprintf(stderr,"%s <CodeParam.txt> <Lr> <Lb> <eps> <seed|-1>\n",argv[0]);
+    return 1;
+  } // if
+  fn  =      argv[1];
+  Lr  = atoi(argv[2]);
+  Lb  = atoi(argv[3]);
+  eps = atof(argv[4]);
+  seed= atoi(argv[5]);
+  if(seed==-1) seed = (int)time(NULL);
+  srandom(seed);
+  printf("# Lr=%d (Lb,eps)=(%d,%e) [%d]\n",Lr,Lb,eps,seed);
+  printf("# Code param: %s\n",fn);
+  assert(Lr>0 && Lb>1);
+  assert(eps>=0.0 && eps<=0.5);
+
+  // ----- init -----
+  class CodeParam *CP = new class CodeParam(fn);
+  beta= CP->get_beta();
+  nu  = CP->get_nu();
+  B   = new int [nu];
+  B2p = new unsigned int [nu];
+  CP->get_B(B);
+  beta2p = (unsigned int)pow(2,beta);
+  beta4p = (unsigned int)pow(4,beta);
+  for(int i=0;i<nu;i++) B2p[i] = (int)pow(2,B[i]);
+  wL = (int)ceil( Lb*(0.5-eps));
+  wH = (int)floor(Lb*(0.5+eps));
+  printf("# beta2p=%u beta4p=%u (wL,wH)=(%d,%d)\n",beta2p,beta4p,wL,wH);
+  PrintVect(B2p,nu,"# B2p: ","\n");
+  BCB = new class bmatrix(beta2p,nu);
+  BCB->clear();
+  WT = new int [nu];
+  for(int i=0;i<nu;i++)
+    WT[i] = (i%2==0)? (int)floor((double)beta/2.0) : (int)ceil((double)beta/2.0);
+  PrintVect(WT,nu,"# WT:  ","\n");
+  
+  // ----- set -----
+  SetIntraConst();   // (1) intra-word: RL LGCB sync01
+  SetInterConst();   // (2) inter-word: LGCB
+  //PrintBCB();
+  
+  delete CP;
+  delete BCB;
+  delete [] B;
+  delete [] B2p;
+  delete [] WT;
+  return 0;
+}
+
+//================================================================================
+void SetIntraConst(){
+  int cb;
+  unsigned int u;
+  unsigned char *U = new unsigned char [beta];
+
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    if(U[0]!=0 || U[beta-1]!=1) continue;
+    if(MaxRunLength(U,beta)>Lr) continue;
+    for(cb=0;cb<nu;cb++){
+      if(HammingWeight(U,beta)==WT[cb]) BCB->setV(u,cb,1);
+    } // for cb
+    //(dbg)
+    //PrintVect2(U,beta,"","\n");
+  } // for u
+
+  delete [] U;
+}
+
+//================================================================================
+void SetInterConst(){
+  int **CNT = new int * [beta2p];
+  for(unsigned int u=0;u<beta2p;u++) CNT[u] = new int [nu];
+  int ***WTL = new int ** [nu];   // WTL[nu][idx][WT]: Hamming weight [0:idx]
+  int ***WTR = new int ** [nu];   // WTR[nu][idx][WT]: Hamming weight [idx:beta-1]
+  for(int i=0;i<nu;i++){
+    WTL[i] = new int * [beta];
+    WTR[i] = new int * [beta];
+    for(int j=0;j<beta;j++){
+      WTL[i][j] = new int [beta+1];
+      WTR[i][j] = new int [beta+1];
+    } // for j
+  } // for i
+
+  SetInterConstWTLRinit(WTL,WTR);
+  PrintWTLR((const int ***)WTL, (const int ***)WTR);
+  
+  SetInterConstCNT(CNT);
+
+  // ----- delete 
+  for(unsigned int u=0;u<beta2p;u++) delete [] CNT[u];
+  delete [] CNT;
+  for(int i=0;i<nu;i++){
+    for(int j=0;j<beta;j++){
+      delete [] WTL[i][j];
+      delete [] WTR[i][j];
+    } // for j
+    delete [] WTL[i];
+    delete [] WTR[i];
+  } // for i
+  delete [] WTL;
+  delete [] WTR;
+}
+
+//================================================================================
+void SetInterConstWTLRinit(int ***WTL, int ***WTR){
+  unsigned int u;
+  int cb,idx,wl,wr;
+  unsigned char *U = new unsigned char [beta];
+
+  // clear
+  for(int i=0;i<nu;i++){
+    ClearArray(WTL[i],beta,beta+1);
+    ClearArray(WTR[i],beta,beta+1);
+  } // for i
+  
+  // count
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    for(idx=0;idx<beta;idx++){
+      wl = HammingWeight(U,      idx+1);
+      wr = HammingWeight(&U[idx],beta-idx);
+      for(cb=0;cb<nu;cb++){
+	if(BCB->getV(u,cb)==1){
+	  WTL[cb][idx][wl]++;
+	  WTR[cb][idx][wr]++;
+	} // if BCB
+      } // for cb
+    } // for idx
+  } // for u
+
+  delete [] U;
+}
+
+//================================================================================
+void SetInterConstCNT(int **CNT){
+  int cb,idx;
+  unsigned int u;
+  unsigned char *U = new unsigned char [beta];
+  ClearArray(CNT,(int)beta2p,nu);
+
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    for(cb=0;cb<nu;cb++){
+      if(BCB->getV(u,cb)==1){
+	for(idx=0;idx<beta;idx++){
+	} // for idx
+      } // if BCB
+    } // for cb
+  } // for u
+  
+  delete [] U;
+}
+
+//================================================================================
+int CalcWeightL(const unsigned char *U, int cb, int pos){
+  assert(cb>=0  && cb<nu);
+  assert(pos>=0 && pos<beta);
+  if(pos+1>=Lb) return HammingWeight(&U[pos+1-Lb],Lb);
+  int w = HammingWeight(U,pos+1);
+  //int len = Lb - (pos+1);
+  
+  return w;
+}
+
+//================================================================================
+void PrintBCB(){
+  int cb;
+  unsigned int u;
+  unsigned char *U = new unsigned char [beta];
+  bool flg;
+  for(u=0;u<beta2p;u++){
+    ConvIntV2(U,u,beta);
+    flg=false;
+    for(cb=0;cb<nu;cb++)
+      if(BCB->getV(u,cb)==1) flg=true;
+    PrintVect2(U,beta,""," ");
+    printf("(%02d) ",HammingWeight(U,beta));
+    for(cb=0;cb<nu;cb++) printf("%d",BCB->getV(u,cb));
+    if(flg) printf(" CW");
+    printf("\n");
+  } // for u  
+  delete [] U;
+}
+
+//================================================================================
+void PrintWTLR(const int ***WTL, const int ***WTR){
+  for(int cb=0;cb<nu;cb++){
+    printf("[%d]\n",cb);
+    for(int idx=0;idx<beta;idx++){
+      for(int w=0;w<beta+1;w++){
+	printf("%04d ",WTL[cb][idx][w]);
+      } // for w
+      printf("\n");
+    } // for idx
+    printf("---\n");
+    for(int idx=0;idx<beta;idx++){
+      for(int w=0;w<beta+1;w++){
+	printf("%04d ",WTR[cb][idx][w]);
+      } // for w
+      printf("\n");
+    } // for idx    
+  } // for cb
+}
