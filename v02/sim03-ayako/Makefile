@@ -1,4 +1,4 @@
-all: func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o CBsearch GenEncCM sim
+all: func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o CBsearch GenEncCM sim test test_pyx test_v2
 
 func.o: func.cpp func.hpp Makefile
 	g++ -Wall -O3 -c -o func.o func.cpp
@@ -24,6 +24,15 @@ GenEncCM: GenEncCM.cpp func.o ChannelMatrix.o InnerCodebook.o Makefile
 sim: sim.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
 	g++ -Wall -O3 -o sim func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o sim.cpp
 
+test: test.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
+	g++ -Wall -O3 -o test func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o test.cpp
+
+test_pyx: test_pyx.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
+	g++ -Wall -O3 -o test_pyx func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o test_pyx.cpp
+
+test_v2: test_v2.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
+	g++ -Wall -O3 -o test_v2 func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o test_v2.cpp
+
 clean:
-	rm -f CBsearch GenEncCM sim *.o
+	rm -f CBsearch GenEncCM sim test test_pyx test_v2 *.o
 

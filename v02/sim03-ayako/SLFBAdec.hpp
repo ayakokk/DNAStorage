@@ -1,3 +1,7 @@
+#include <map>
+#include <vector>
+#include <string>
+
 class SLFBAdec {
 private:
   int    Ns;            // block length (symbol)
@@ -9,8 +13,13 @@ private:
   int    Nu2max,Nu2min; // recv symbol length
   long   Nu2p;          // = pow(2,Nu)
   double Pi,Pd,Ps,Pt;   // channel
+  // k-mer依存遷移確率テーブル: [kmer][previous_event] -> [next_event_probabilities]
+  std::map<std::string, std::map<int, std::vector<double>>> transition_probs;
+  int    k_mer_length;  // k-merの長さ
   double **GD;          // [Drng][Drng]: P(d_Nu | d_0)
   double ***GX;         // [Nu2][y][x]:  P(y|x,d0,d1)
+  double ****GXNew;      // [Nu2][y][x][e]:  P(y|x,e) 新しい確率分布（イベント条件付き）
+  double ****GENew;      // [Nu2][y][x][e]:  P(e_(i+1)v|e_iv, φ0(u'_(i-⌈k/v⌉+1)), φ0(u'_(i-⌈k/v⌉)), φ0(u'_i), φ0(u'_(i+1)), d_iv, d_(i+1)v)
   double **PF, **PB;    // [Ns+1][Drng]: FG forward/backward
   double **PU, **PD;    // [Ns][Q]:      FG up/down
   double **PI, **PO;    // [Ns][Q]:      FG input/output
@@ -39,6 +48,23 @@ private:
   void DelGX();
   double CalcPyx(long y, long x, int ly, int lx);  // P(y|x)
   double GetGX(int Nu2, long y, long xi);
+  void SetGXNew();
+  void DelGXNew();
+  double CalcPyxNew(long y, long x, int ly, int lx, int error_state);  // P(y|x,e)
+  // 格子計算ヘルパー関数
+  void initializeLattice(std::vector<std::vector<std::vector<double>>>& F, int lx, int ly);
+  void calculateLatticeDP(std::vector<std::vector<std::vector<double>>>& F, 
+                         const unsigned char* X, const unsigned char* Y, int lx, int ly);
+  double getTransitionProbability(int prev_state, int curr_state);
+  double GetGXNew(int Nu2, long y, long xi, int error_state);
+  void SetGENew();
+  void DelGENew();
+  double CalcPexNew(long y, long x, int ly, int lx);  // P(e_(i+1)v|...)
+  double GetGENew(int Nu2, long y, long xi);
+  // k-mer確率テーブル関連メソッド
+  void loadTransitionProbabilities(int k);
+  std::string binaryToDNA(const unsigned char* binary_seq, int length);
+  std::string extractKmerFromSequence(const unsigned char* seq, int seq_len, int pos, int k);
   void SetFG();
   void DelFG();
   void InitFG(const unsigned char *RW, const double **Pin, int Nb2);
@@ -54,4 +80,11 @@ public:
   void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW);  // (uniform prior)
   void PrintNode(int idx, int iw);
   void PrintNode(const int *dbgIW);
+  // 確率テーブル出力メソッド
+  void exportTransitionProbabilities(const char* filename);
+  void exportGXNewTable(const char* filename);
+  void exportGENewTable(const char* filename);
+  void exportAllProbabilityTables(const char* output_dir);
+  // 格子計算デバッグ用メソッド
+  void debugLatticeCalculation(long y, long x, int ly, int lx, const char* filename);
 };

@@ -1,0 +1,30 @@
+# SLFBAdec Probability Tables Summary
+# Generated on: Jul 24 2025 20:07:32
+
+## Parameters
+Nu (symbol length): 6
+Q (codewords): 18
+k-mer length: 4
+Nu2min: 3
+Nu2max: 9
+Channel parameters: Pi=0.05 Pd=0.05 Ps=0.05 Pt=0.9
+
+## Generated Files
+1. transition_probabilities.txt - k-mer dependent transition probabilities
+2. GXNew_table.txt - Channel output probabilities P(y|x,e)
+3. GENew_table.txt - Error state transition probabilities P(e_(i+1)v|...)
+
+## k-mer Statistics
+Total k-mers in transition table: 255
+
+## Sample k-mers (first 10)
+AAAA: 4 event types
+AAAC: 4 event types
+AAAG: 4 event types
+AAAT: 4 event types
+AACA: 4 event types
+AACC: 4 event types
+AACG: 4 event types
+AACT: 4 event types
+AAGA: 4 event types
+AAGC: 4 event types

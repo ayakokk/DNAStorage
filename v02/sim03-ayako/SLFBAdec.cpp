@@ -4,6 +4,13 @@
 #include <math.h>
 #include <time.h>
 #include <assert.h>
+#include <map>
+#include <vector>
+#include <string>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <iostream>
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -136,7 +143,7 @@ void SLFBAdec::normalize(double *V, int len){
 
 //================================================================================
 void SLFBAdec::SetGD(){
-  // p(d)　ドリフト遷移確率
+  // p(d)　ドリフト遷移確率の設定
   double **GDX = new double * [Drng];  // for calc
   GD = new double * [Drng];
   for(int i=0;i<Drng;i++){
@@ -171,7 +178,9 @@ void SLFBAdec::DelGD(){
 
 //================================================================================
 void SLFBAdec::SetGX(){
-  // p(y|φ_0(u'), d) チャネル確率
+  // 符号語とチャネル出力の関係を事前計算
+  // Nu = 送信シンボル長
+  // Nu2 = 受診シンボル長
   long ly2p,x;
   unsigned char *X = new unsigned char [Nu];
   GX = new double ** [Nu*2+1];
@@ -220,6 +229,7 @@ void SLFBAdec::DelGX(){
 
 //================================================================================
 double SLFBAdec::CalcPyx(long y, long x, int ly, int lx){
+  // チャネル確率p(y|x,d)の計算
   assert(lx>0 && ly>=0);
   //printf("y=%ld x=%ld ly=%d lx=%d\n",y,x,ly,lx);
   if(ly==0) return pow(Pd,lx);
@@ -272,6 +282,920 @@ double SLFBAdec::GetGX(int Nu2, long y, long xi){
   assert(xi>=0 && xi<Q);
   if(Nu2<Nu2min || Nu2>Nu2max) return GX[Nu2][0][0 ]; // approx
   else                         return GX[Nu2][y][xi]; 
+}
+
+//================================================================================
+void SLFBAdec::SetGXNew(){
+  // 新しい確率分布の事前計算: P(y|φ_0(u'_i), e_iv, d_iv, d_(i+1)v)
+  long ly2p,x;
+  unsigned char *X = new unsigned char [Nu];
+  GXNew = new double *** [Nu*2+1];
+  for(int ly=0;ly<=Nu*2;ly++){
+    if(ly<Nu2min || ly>Nu2max){
+      // approximate
+      GXNew[ly]    = new double ** [1];
+      GXNew[ly][0] = new double * [1];
+      GXNew[ly][0][0] = new double [4];  // 4つのエラー状態
+      // 各エラー状態への適切な確率設定
+      if(ly == 0) {
+        // 削除のみが可能（受信長0）
+        GXNew[ly][0][0][0] = 0.0;              // Match (不可能)
+        GXNew[ly][0][0][1] = 0.0;              // Insertion (不可能)
+        GXNew[ly][0][0][2] = pow(Pd,Nu);       // Deletion (全削除)
+        GXNew[ly][0][0][3] = 0.0;              // Substitution (不可能)
+      } else {
+        // その他の近似計算
+        double base_prob = (ly<Nu)? pow(Pd,Nu-ly) : pow(Pi,ly-Nu);
+        GXNew[ly][0][0][0] = base_prob * 0.7;  // Match
+        GXNew[ly][0][0][1] = base_prob * 0.1;  // Insertion
+        GXNew[ly][0][0][2] = base_prob * 0.1;  // Deletion
+        GXNew[ly][0][0][3] = base_prob * 0.1;  // Substitution
+      }
+    } else {
+      // exact
+      ly2p = (long)pow(2,ly);
+      GXNew[ly] = new double ** [ly2p];
+      for(long y=0;y<ly2p;y++){
+        GXNew[ly][y] = new double * [Q];
+        for(int xi=0;xi<Q;xi++){
+          ICB->Get_CW(X,xi);
+          x = VectToLong(X,Nu);
+          GXNew[ly][y][xi] = new double [4];  // 4つのエラー状態
+          // 修正されたCalcPyxNew関数を使用
+          // 各エラー状態の確率を個別に計算せず、総和を各状態に分配
+          double total_prob = CalcPyxNew(y,x,ly,Nu,0); // 全状態の総確率
+          
+          // lattice.cppに基づく状態分布（近似）
+          double state_weights[4] = {0.7, 0.1, 0.1, 0.1}; // Match, Ins, Del, Sub
+          for(int e=0; e<4; e++){
+            GXNew[ly][y][xi][e] = total_prob * state_weights[e];
+          }
+        } // for xi
+      } // for y
+    } // if ly
+  } // for ly
+  delete [] X;
+}
+
+//================================================================================
+void SLFBAdec::DelGXNew(){
+  int i2p;
+  for(int i=0;i<=Nu*2;i++){
+    if(i<Nu2min || i>Nu2max){
+      delete [] GXNew[i][0][0];
+      delete [] GXNew[i][0];
+      delete [] GXNew[i];
+    } else {
+      i2p = (long)pow(2,i);
+      for(long y=0;y<i2p;y++){
+        for(int xi=0;xi<Q;xi++){
+          delete [] GXNew[i][y][xi];
+        }
+        delete [] GXNew[i][y];
+      }
+      delete [] GXNew[i];
+    } // if i
+  } // for i
+  delete [] GXNew;
+}
+
+//================================================================================
+double SLFBAdec::CalcPyxNew(long y, long x, int ly, int lx, int error_state){
+  // lattice.cppに基づく格子計算による正確なチャネル確率p(y|x,e)の計算
+  assert(lx>0 && ly>=0);
+  assert(error_state>=0 && error_state<4);
+  
+  unsigned char *X = new unsigned char [lx];
+  unsigned char *Y = new unsigned char [ly];
+  LongToVect(X,x,lx);
+  LongToVect(Y,y,ly);
+  
+  // 格子計算用の3次元配列 F[n][m][e]
+  std::vector<std::vector<std::vector<double>>> F(lx+1, 
+    std::vector<std::vector<double>>(ly+1, std::vector<double>(4, 0.0)));
+  
+  // 格子の初期化
+  initializeLattice(F, lx, ly);
+  
+  // 動的プログラミングによる格子計算
+  calculateLatticeDP(F, X, Y, lx, ly);
+  
+  delete [] X;
+  delete [] Y;
+  
+  // 指定されたエラー状態での終端確率を返す
+  return F[lx][ly][error_state];
+}
+
+//================================================================================
+void SLFBAdec::initializeLattice(std::vector<std::vector<std::vector<double>>>& F, int lx, int ly){
+  // 初期状態の設定（lattice.cppと同じ）
+  // F[0][0][0] = 1.0でMatch状態から開始
+  F[0][0][0] = 1.0; // Match状態から開始
+  F[0][0][1] = 0.0; // Substitution
+  F[0][0][2] = 0.0; // Deletion  
+  F[0][0][3] = 0.0; // Insertion
+}
+
+//================================================================================
+double SLFBAdec::getTransitionProbability(int prev_state, int curr_state){
+  // lattice.cppの遷移確率行列と同じ値
+  double P_transition[4][4] = {
+    {0.7, 0.1, 0.1, 0.1},  // Match からの遷移
+    {0.6, 0.2, 0.1, 0.1},  // Substitution からの遷移  
+    {0.5, 0.1, 0.3, 0.1},  // Deletion からの遷移
+    {0.5, 0.1, 0.1, 0.3}   // Insertion からの遷移
+  };
+  
+  return P_transition[prev_state][curr_state];
+}
+
+//================================================================================
+void SLFBAdec::calculateLatticeDP(std::vector<std::vector<std::vector<double>>>& F, 
+                                  const unsigned char* X, const unsigned char* Y, int lx, int ly){
+  // lattice.cppと同じ格子計算ロジック
+  
+  for(int n = 0; n <= lx; n++){
+    for(int m = 0; m <= ly; m++){
+      
+      // Match計算（対角線移動: n-1,m-1 -> n,m）
+      if(n > 0 && m > 0 && X[n-1] == Y[m-1]){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 0); // Match=0
+          double match_prob = Psub(X[n-1], Y[m-1]) * Pt;
+          F[n][m][0] += prev_prob * trans_prob * match_prob;
+        }
+      }
+      
+      // Substitution計算（対角線移動: n-1,m-1 -> n,m）
+      if(n > 0 && m > 0 && X[n-1] != Y[m-1]){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 1); // Substitution=1
+          double sub_prob = Psub(X[n-1], Y[m-1]) * Pt * (1.0/3.0);
+          F[n][m][1] += prev_prob * trans_prob * sub_prob;
+        }
+      }
+      
+      // Deletion計算（垂直移動: n-1,m -> n,m）
+      if(n > 0){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 2); // Deletion=2
+          double del_prob = Pd;
+          F[n][m][2] += prev_prob * trans_prob * del_prob;
+        }
+      }
+      
+      // Insertion計算（水平移動: n,m-1 -> n,m）
+      if(m > 0){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 3); // Insertion=3
+          double ins_prob = Pi * (1.0/4.0); // 4つの塩基への等確率挿入
+          F[n][m][3] += prev_prob * trans_prob * ins_prob;
+        }
+      }
+      
+    } // for m
+  } // for n
+}
+
+//================================================================================
+void SLFBAdec::debugLatticeCalculation(long y, long x, int ly, int lx, const char* filename){
+  // 特定のy,xペアに対する格子計算の詳細なデバッグ出力
+  
+  unsigned char *X = new unsigned char [lx];
+  unsigned char *Y = new unsigned char [ly];
+  LongToVect(X,x,lx);
+  LongToVect(Y,y,ly);
+  
+  std::ofstream file(filename);
+  if(!file.is_open()){
+    printf("Error: Cannot open debug file %s\n", filename);
+    delete [] X;
+    delete [] Y;
+    return;
+  }
+  
+  file << "=== Lattice Calculation Debug ===" << std::endl;
+  file << "Input (x): ";
+  for(int i=0; i<lx; i++) file << (int)X[i];
+  file << " (binary), " << x << " (decimal)" << std::endl;
+  file << "Output (y): ";
+  for(int i=0; i<ly; i++) file << (int)Y[i];
+  file << " (binary), " << y << " (decimal)" << std::endl;
+  file << "Length: lx=" << lx << ", ly=" << ly << std::endl;
+  file << std::endl;
+  
+  // 格子計算用の3次元配列 F[n][m][e]
+  std::vector<std::vector<std::vector<double>>> F(lx+1, 
+    std::vector<std::vector<double>>(ly+1, std::vector<double>(4, 0.0)));
+  
+  // 格子の初期化
+  F[0][0][0] = 1.0; // Match状態から開始
+  file << "=== Initialization ===" << std::endl;
+  file << "F[0][0][0] = 1.0 (Match state)" << std::endl;
+  file << std::endl;
+  
+  // 遷移確率行列の出力
+  file << "=== Transition Probability Matrix ===" << std::endl;
+  file << "P_transition[prev_state][curr_state]:" << std::endl;
+  file << "        M      S      D      I" << std::endl;
+  file << "M:   0.70   0.10   0.10   0.10" << std::endl;
+  file << "S:   0.60   0.20   0.10   0.10" << std::endl;
+  file << "D:   0.50   0.10   0.30   0.10" << std::endl;
+  file << "I:   0.50   0.10   0.10   0.30" << std::endl;
+  file << std::endl;
+  
+  // 動的プログラミングによる格子計算（詳細ログ付き）
+  file << "=== Dynamic Programming Calculation ===" << std::endl;
+  
+  for(int n = 0; n <= lx; n++){
+    for(int m = 0; m <= ly; m++){
+      
+      if(n == 0 && m == 0) continue; // 初期状態はスキップ
+      
+      file << "--- Processing F[" << n << "][" << m << "] ---" << std::endl;
+      if(n > 0 && m > 0){
+        file << "Comparing: X[" << (n-1) << "]=" << (int)X[n-1] 
+             << " vs Y[" << (m-1) << "]=" << (int)Y[m-1];
+        file << " -> " << (X[n-1] == Y[m-1] ? "MATCH" : "MISMATCH") << std::endl;
+      }
+      
+      double old_values[4] = {F[n][m][0], F[n][m][1], F[n][m][2], F[n][m][3]};
+      
+      // Match計算（対角線移動: n-1,m-1 -> n,m）
+      if(n > 0 && m > 0 && X[n-1] == Y[m-1]){
+        file << "  Match calculation:" << std::endl;
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 0); // Match=0
+          double match_prob = Psub(X[n-1], Y[m-1]) * Pt;
+          double contribution = prev_prob * trans_prob * match_prob;
+          F[n][m][0] += contribution;
+          
+          if(prev_prob > 0){
+            file << "    From state " << prev_e << ": " << prev_prob 
+                 << " * " << trans_prob << " * " << match_prob 
+                 << " = " << contribution << std::endl;
+          }
+        }
+      }
+      
+      // Substitution計算（対角線移動: n-1,m-1 -> n,m）
+      if(n > 0 && m > 0 && X[n-1] != Y[m-1]){
+        file << "  Substitution calculation:" << std::endl;
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 1); // Substitution=1
+          double sub_prob = Psub(X[n-1], Y[m-1]) * Pt * (1.0/3.0);
+          double contribution = prev_prob * trans_prob * sub_prob;
+          F[n][m][1] += contribution;
+          
+          if(prev_prob > 0){
+            file << "    From state " << prev_e << ": " << prev_prob 
+                 << " * " << trans_prob << " * " << sub_prob 
+                 << " = " << contribution << std::endl;
+          }
+        }
+      }
+      
+      // Deletion計算（垂直移動: n-1,m -> n,m）
+      if(n > 0){
+        file << "  Deletion calculation:" << std::endl;
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 2); // Deletion=2
+          double del_prob = Pd;
+          double contribution = prev_prob * trans_prob * del_prob;
+          F[n][m][2] += contribution;
+          
+          if(prev_prob > 0){
+            file << "    From state " << prev_e << ": " << prev_prob 
+                 << " * " << trans_prob << " * " << del_prob 
+                 << " = " << contribution << std::endl;
+          }
+        }
+      }
+      
+      // Insertion計算（水平移動: n,m-1 -> n,m）
+      if(m > 0){
+        file << "  Insertion calculation:" << std::endl;
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 3); // Insertion=3
+          double ins_prob = Pi * (1.0/4.0); // 4つの塩基への等確率挿入
+          double contribution = prev_prob * trans_prob * ins_prob;
+          F[n][m][3] += contribution;
+          
+          if(prev_prob > 0){
+            file << "    From state " << prev_e << ": " << prev_prob 
+                 << " * " << trans_prob << " * " << ins_prob 
+                 << " = " << contribution << std::endl;
+          }
+        }
+      }
+      
+      // 結果の出力
+      file << "  Results: F[" << n << "][" << m << "] = [";
+      for(int e = 0; e < 4; e++){
+        if(e > 0) file << ", ";
+        file << std::scientific << std::setprecision(6) << F[n][m][e];
+      }
+      file << "]" << std::endl;
+      
+      // 変化量の出力
+      bool changed = false;
+      for(int e = 0; e < 4; e++){
+        if(F[n][m][e] != old_values[e]) changed = true;
+      }
+      if(changed){
+        file << "  Changes: [";
+        for(int e = 0; e < 4; e++){
+          if(e > 0) file << ", ";
+          double change = F[n][m][e] - old_values[e];
+          file << std::scientific << std::setprecision(6) << change;
+        }
+        file << "]" << std::endl;
+      }
+      file << std::endl;
+      
+    } // for m
+  } // for n
+  
+  // 最終結果
+  file << "=== Final Results ===" << std::endl;
+  file << "F[" << lx << "][" << ly << "] = [";
+  for(int e = 0; e < 4; e++){
+    if(e > 0) file << ", ";
+    file << std::scientific << std::setprecision(6) << F[lx][ly][e];
+  }
+  file << "]" << std::endl;
+  file << std::endl;
+  
+  file << "Error state probabilities:" << std::endl;
+  file << "Match (0):       " << std::scientific << std::setprecision(6) << F[lx][ly][0] << std::endl;
+  file << "Substitution (1): " << std::scientific << std::setprecision(6) << F[lx][ly][1] << std::endl;
+  file << "Deletion (2):    " << std::scientific << std::setprecision(6) << F[lx][ly][2] << std::endl;
+  file << "Insertion (3):   " << std::scientific << std::setprecision(6) << F[lx][ly][3] << std::endl;
+  
+  file.close();
+  delete [] X;
+  delete [] Y;
+  
+  printf("Lattice debug output saved to: %s\n", filename);
+}
+
+//================================================================================
+double SLFBAdec::GetGXNew(int Nu2, long y, long xi, int error_state){
+  assert(Nu2>=0 && Nu2<=2*Nu);
+  assert(y >=0);
+  assert(xi>=0 && xi<Q);
+  assert(error_state>=0 && error_state<4);
+  
+  if(Nu2<Nu2min || Nu2>Nu2max) return GXNew[Nu2][0][0][error_state]; // approx
+  else                         return GXNew[Nu2][y][xi][error_state]; 
+}
+
+//================================================================================
+void SLFBAdec::SetGENew(){
+  // 新しい確率分布の事前計算: P(e_(i+1)v|e_iv, φ0(u'_(i-⌈k/v⌉+1)), φ0(u'_(i-⌈k/v⌉)), φ0(u'_i), φ0(u'_(i+1)), d_iv, d_(i+1)v)
+  long ly2p,x;
+  unsigned char *X = new unsigned char [Nu];
+  GENew = new double *** [Nu*2+1];
+  for(int ly=0;ly<=Nu*2;ly++){
+    if(ly<Nu2min || ly>Nu2max){
+      // approximate
+      GENew[ly]    = new double ** [1];
+      GENew[ly][0] = new double * [1];
+      GENew[ly][0][0] = new double [4];  // 4つのエラー状態
+      // k-merコンテキスト依存の基本確率（簡略版）
+      double base_prob = (ly<Nu)? pow(Pd,Nu-ly) : pow(Pi,ly-Nu);
+      // 遷移確率行列（eLattice_v7.cppと同じ）
+      GENew[ly][0][0][0] = base_prob * 0.7;  // Match状態継続確率
+      GENew[ly][0][0][1] = base_prob * 0.1;  // Insertion状態遷移確率  
+      GENew[ly][0][0][2] = base_prob * 0.1;  // Deletion状態遷移確率
+      GENew[ly][0][0][3] = base_prob * 0.1;  // Substitution状態遷移確率
+    } else {
+      // exact
+      ly2p = (long)pow(2,ly);
+      GENew[ly] = new double ** [ly2p];
+      for(long y=0;y<ly2p;y++){
+        GENew[ly][y] = new double * [Q];
+        for(int xi=0;xi<Q;xi++){
+          ICB->Get_CW(X,xi);
+          x = VectToLong(X,Nu);
+          GENew[ly][y][xi] = new double [4];  // 4つのエラー状態
+          // k-merコンテキスト依存の確率計算
+          double base_prob = CalcPexNew(y,x,ly,Nu);
+          // 各エラー状態への遷移確率を設定
+          GENew[ly][y][xi][0] = base_prob * 0.7;  // Match状態継続
+          GENew[ly][y][xi][1] = base_prob * 0.1;  // Insertion状態遷移
+          GENew[ly][y][xi][2] = base_prob * 0.1;  // Deletion状態遷移
+          GENew[ly][y][xi][3] = base_prob * 0.1;  // Substitution状態遷移
+        } // for xi
+      } // for y
+    } // if ly
+  } // for ly
+  delete [] X;
+}
+
+//================================================================================
+void SLFBAdec::DelGENew(){
+  int i2p;
+  for(int i=0;i<=Nu*2;i++){
+    if(i<Nu2min || i>Nu2max){
+      delete [] GENew[i][0][0];
+      delete [] GENew[i][0];
+      delete [] GENew[i];
+    } else {
+      i2p = (long)pow(2,i);
+      for(long y=0;y<i2p;y++){
+        for(int xi=0;xi<Q;xi++){
+          delete [] GENew[i][y][xi];
+        }
+        delete [] GENew[i][y];
+      }
+      delete [] GENew[i];
+    } // if i
+  } // for i
+  delete [] GENew;
+}
+
+//================================================================================
+double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
+  // 実験データベースに基づくk-merコンテキスト依存のエラー状態遷移確率計算
+  // P(e_(i+1)v|e_iv, φ0(u'_(i-⌈k/v⌉+1)), φ0(u'_(i-⌈k/v⌉)), φ0(u'_i), φ0(u'_(i+1)), d_iv, d_(i+1)v)
+  assert(lx>0 && ly>=0);
+  
+  if(ly==0) return pow(Pd,lx);
+  
+  long x1,y1;
+  double ret,qt,qi,qd;
+  unsigned char *X = new unsigned char [lx];
+  unsigned char *Y = new unsigned char [ly];
+  LongToVect(X,x,lx);
+  LongToVect(Y,y,ly);
+  
+  if(lx==1){
+    if(ly==1){
+      // k-merを抽出してテーブルから確率を取得
+      std::string current_kmer = extractKmerFromSequence(X, lx, 0, k_mer_length);
+      
+      // デフォルト確率（実験データがない場合）
+      double match_prob = 0.7, sub_prob = 0.1;
+      
+      // 実験データから確率を取得
+      if (transition_probs.find(current_kmer) != transition_probs.end()) {
+        // 前のイベントを0(Match)と仮定、より正確には前の状態を追跡する必要がある
+        auto& probs = transition_probs[current_kmer][0]; // Match から遷移と仮定
+        match_prob = probs[0]; // Match確率
+        sub_prob = probs[3];   // Substitution確率
+      }
+      
+      if(X[0]==Y[0]){
+        ret = Psub(X[0],Y[0]) * Pt * match_prob;  // Match状態継続
+      } else {
+        ret = Psub(X[0],Y[0]) * Pt * sub_prob * (1.0/3.0);  // Substitution状態遷移
+      }
+    } else if(ly==2) {
+      // k-merを抽出してテーブルから挿入確率を取得
+      std::string current_kmer = extractKmerFromSequence(X, lx, 0, k_mer_length);
+      double ins_prob = 0.1; // デフォルト
+      
+      if (transition_probs.find(current_kmer) != transition_probs.end()) {
+        auto& probs = transition_probs[current_kmer][0]; // Match から遷移と仮定
+        ins_prob = probs[1]; // Insertion確率
+      }
+      
+      ret = Psub(X[0],Y[0]) * Psub(X[0],Y[1]) * Pi * ins_prob * (1.0/4.0);  // Insertion状態遷移
+    } else {
+      assert(ly>=3); 
+      ret = 0.0;
+    }
+  } else {
+    x1 = VectToLong(&X[1],lx-1);
+    
+    // k-merを抽出してテーブルから確率を取得
+    std::string current_kmer = extractKmerFromSequence(X, lx, 0, k_mer_length);
+    
+    // デフォルト確率
+    double match_prob = 0.7, ins_prob = 0.1, del_prob = 0.1, sub_prob = 0.1;
+    
+    // 実験データから確率を取得
+    if (transition_probs.find(current_kmer) != transition_probs.end()) {
+      auto& probs = transition_probs[current_kmer][0]; // Match から遷移と仮定
+      match_prob = probs[0]; // Match確率
+      ins_prob = probs[1];   // Insertion確率
+      del_prob = probs[2];   // Deletion確率
+      sub_prob = probs[3];   // Substitution確率
+    }
+    
+    // k-merコンテキストを考慮したMatch/Substitution
+    if(X[0]==Y[0]){
+      qt = Psub(X[0],Y[0]) * Pt * match_prob;  // Match継続
+    } else {
+      qt = Psub(X[0],Y[0]) * Pt * sub_prob * (1.0/3.0);  // Substitution遷移
+    }
+    y1 = (ly==1)? 0 : VectToLong(&Y[1],ly-1);
+    qt *= CalcPexNew(y1,x1,ly-1,lx-1);
+    
+    // k-merコンテキストを考慮したInsertion
+    if(ly<2){
+      qi = 0.0;
+    } else {
+      qi = Psub(X[0],Y[0]) * Psub(X[0],Y[1]) * Pi * ins_prob * (1.0/4.0);  // Insertion遷移
+      y1 = (ly==2)? 0 : VectToLong(&Y[2],ly-2);
+      qi *= CalcPexNew(y1,x1,ly-2,lx-1);
+    }
+    
+    // k-merコンテキストを考慮したDeletion  
+    qd = Pd * del_prob;  // Deletion遷移
+    y1 = y;
+    qd *= CalcPexNew(y1,x1,ly,lx-1);
+    
+    ret = qt + qi + qd;
+  }
+  
+  delete [] X;
+  delete [] Y;
+  return ret;
+}
+
+//================================================================================
+double SLFBAdec::GetGENew(int Nu2, long y, long xi){
+  assert(Nu2>=0 && Nu2<=2*Nu);
+  assert(y >=0);
+  assert(xi>=0 && xi<Q);
+  
+  // この関数はエラー状態の事後確率の合計を返す（正規化前）
+  double total_prob = 0.0;
+  
+  if(Nu2<Nu2min || Nu2>Nu2max) {
+    // approximation: 全エラー状態の確率を合計
+    for(int e=0; e<4; e++) {
+      total_prob += GENew[Nu2][0][0][e];
+    }
+  } else {
+    // exact: 全エラー状態の確率を合計
+    for(int e=0; e<4; e++) {
+      total_prob += GENew[Nu2][y][xi][e];
+    }
+  }
+  
+  return total_prob;
+}
+
+//================================================================================
+void SLFBAdec::loadTransitionProbabilities(int k) {
+  // 確率テーブルを読み込み (eLattice_v7.cppと同じ方法)
+  std::string base_path = "DNArSim-main/simulator/probEdit/k" + std::to_string(k) + "/";
+  
+  std::vector<std::string> event_files = {
+    "KmerYi_prevYiM_RatesAvg.txt", // Match
+    "KmerYi_prevYiI_RatesAvg.txt", // Insertion  
+    "KmerYi_prevYiD_RatesAvg.txt", // Deletion
+    "KmerYi_prevYiS_RatesAvg.txt"  // Substitution
+  };
+  
+  std::vector<std::string> event_names = {"Match", "Insertion", "Deletion", "Substitution"};
+  
+  for (int prev_event = 0; prev_event < 4; prev_event++) {
+    std::string full_path = base_path + event_files[prev_event];
+    printf("# Loading: %s (prev event: %s)\n", full_path.c_str(), event_names[prev_event].c_str());
+    
+    std::ifstream file(full_path);
+    if (!file.is_open()) {
+      printf("# Warning: Cannot open file %s\n", full_path.c_str());
+      continue;
+    }
+    
+    std::string line;
+    int line_count = 0;
+    
+    while (std::getline(file, line)) {
+      std::istringstream iss(line);
+      std::string kmer;
+      double ins, del, sub, err, match;
+      
+      if (iss >> kmer >> ins >> del >> sub >> err >> match) {
+        transition_probs[kmer][prev_event] = {match, ins, del, sub}; // Match, Ins, Del, Sub の順
+        line_count++;
+      }
+    }
+    
+    printf("# Loaded %d k-mers for %s\n", line_count, event_names[prev_event].c_str());
+    file.close();
+  }
+  
+  printf("# Total k-mers in transition table: %zu\n", transition_probs.size());
+}
+
+//================================================================================
+std::string SLFBAdec::binaryToDNA(const unsigned char* binary_seq, int length) {
+  // バイナリペアをDNA塩基に変換するテーブル
+  std::map<std::pair<int,int>, char> binary_to_dna = {
+    {{0,0}, 'A'}, {{0,1}, 'T'}, {{1,0}, 'G'}, {{1,1}, 'C'}
+  };
+  
+  std::string dna_seq;
+  for (int i = 0; i < length; i += 2) {
+    if (i + 1 < length) {
+      std::pair<int,int> pair = {binary_seq[i], binary_seq[i+1]};
+      if (binary_to_dna.find(pair) != binary_to_dna.end()) {
+        dna_seq += binary_to_dna[pair];
+      } else {
+        dna_seq += 'A'; // デフォルト
+      }
+    }
+  }
+  return dna_seq;
+}
+
+//================================================================================
+std::string SLFBAdec::extractKmerFromSequence(const unsigned char* seq, int seq_len, int pos, int k) {
+  // バイナリ配列からk-merを抽出してDNA配列に変換
+  if (pos < 0 || pos >= seq_len || seq_len < k*2) {
+    return std::string(k, 'A'); // デフォルト
+  }
+  
+  // k-mer抽出位置の計算（k文字のDNAに必要な2k個のバイナリビット）
+  int start_pos = std::max(0, pos - k*2 + 2);
+  int extract_length = std::min(k*2, seq_len - start_pos);
+  
+  if (extract_length < k*2) {
+    return std::string(k, 'A'); // デフォルト
+  }
+  
+  // バイナリからDNAに変換
+  std::string dna_kmer = binaryToDNA(seq + start_pos, extract_length);
+  
+  // k文字に満たない場合は'A'で埋める
+  while (dna_kmer.length() < static_cast<size_t>(k)) {
+    dna_kmer += 'A';
+  }
+  
+  // k文字を超える場合は切り詰める
+  if (dna_kmer.length() > static_cast<size_t>(k)) {
+    dna_kmer = dna_kmer.substr(0, k);
+  }
+  
+  return dna_kmer;
+}
+
+//================================================================================
+void SLFBAdec::exportTransitionProbabilities(const char* filename) {
+  printf("# Exporting transition probabilities to %s\n", filename);
+  
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    printf("# Error: Cannot create file %s\n", filename);
+    return;
+  }
+  
+  std::vector<std::string> event_names = {"Match", "Insertion", "Deletion", "Substitution"};
+  
+  // ヘッダー
+  file << "# k-mer Transition Probability Table\n";
+  file << "# Format: kmer prev_event match_prob ins_prob del_prob sub_prob\n";
+  file << "# prev_event: 0=Match, 1=Insertion, 2=Deletion, 3=Substitution\n";
+  file << "kmer\tprev_event\tmatch_prob\tins_prob\tdel_prob\tsub_prob\n";
+  
+  for (const auto& kmer_entry : transition_probs) {
+    const std::string& kmer = kmer_entry.first;
+    for (const auto& event_entry : kmer_entry.second) {
+      int prev_event = event_entry.first;
+      const std::vector<double>& probs = event_entry.second;
+      
+      file << kmer << "\t" << prev_event << "\t";
+      file << std::scientific << std::setprecision(6);
+      file << probs[0] << "\t" << probs[1] << "\t" << probs[2] << "\t" << probs[3] << "\n";
+    }
+  }
+  
+  file.close();
+  printf("# Exported %zu k-mers to %s\n", transition_probs.size(), filename);
+}
+
+//================================================================================
+void SLFBAdec::exportGXNewTable(const char* filename) {
+  printf("# Exporting GXNew table to %s\n", filename);
+  
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    printf("# Error: Cannot create file %s\n", filename);
+    return;
+  }
+  
+  // ヘッダー
+  file << "# GXNew Probability Table: P(y|x,e)\n";
+  file << "# Format: Nu2 binary(y) binary(xi) error_state probability\n";
+  file << "# error_state: 0=Match, 1=Insertion, 2=Deletion, 3=Substitution\n";
+  file << "Nu2\tbinary(y)\tbinary(xi)\terror_state\tprobability\n";
+  
+  unsigned char *Y = new unsigned char [Nu*2]; // 最大受信長
+  unsigned char *X = new unsigned char [Nu];   // 送信コードワード
+  
+  int count = 0;
+  for(int Nu2 = 0; Nu2 <= Nu*2; Nu2++) {
+    if(Nu2 < Nu2min || Nu2 > Nu2max) {
+      // approximate case
+      for(int e = 0; e < 4; e++) {
+        file << Nu2 << "\t";
+        
+        // y=0のバイナリ表現
+        if(Nu2 > 0) {
+          LongToVect(Y, 0, Nu2);
+          for(int i = 0; i < Nu2; i++) file << (int)Y[i];
+        } else {
+          file << "(empty)";
+        }
+        file << "\t";
+        
+        // xi=0のバイナリ表現（コードワード）
+        ICB->Get_CW(X, 0);
+        for(int i = 0; i < Nu; i++) file << (int)X[i];
+        
+        file << "\t" << e << "\t" << std::scientific << std::setprecision(6) 
+             << GXNew[Nu2][0][0][e] << "\n";
+        count++;
+      }
+    } else {
+      // exact case
+      long Nu2p = (long)pow(2, Nu2);
+      for(long y = 0; y < Nu2p && y < 100; y++) { // 最初の100個のyのみ出力（ファイルサイズ制限）
+        // yをバイナリに変換
+        LongToVect(Y, y, Nu2);
+        
+        for(int xi = 0; xi < Q; xi++) {
+          // xiのコードワードを取得
+          ICB->Get_CW(X, xi);
+          
+          for(int e = 0; e < 4; e++) {
+            file << Nu2 << "\t";
+            
+            // yのバイナリ表現
+            for(int i = 0; i < Nu2; i++) file << (int)Y[i];
+            file << "\t";
+            
+            // xiのバイナリ表現（コードワード）
+            for(int i = 0; i < Nu; i++) file << (int)X[i];
+            
+            file << "\t" << e << "\t" 
+                 << std::scientific << std::setprecision(6) 
+                 << GXNew[Nu2][y][xi][e] << "\n";
+            count++;
+          }
+        }
+      }
+    }
+  }
+  
+  delete [] Y;
+  delete [] X;
+  file.close();
+  printf("# Exported %d GXNew entries to %s\n", count, filename);
+}
+
+//================================================================================
+void SLFBAdec::exportGENewTable(const char* filename) {
+  printf("# Exporting GENew table to %s\n", filename);
+  
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    printf("# Error: Cannot create file %s\n", filename);
+    return;
+  }
+  
+  // ヘッダー
+  file << "# GENew Probability Table: P(e_(i+1)v|...)\n";
+  file << "# Format: Nu2 binary(y) binary(xi) error_state probability\n";
+  file << "# error_state: 0=Match, 1=Insertion, 2=Deletion, 3=Substitution\n";
+  file << "Nu2\tbinary(y)\tbinary(xi)\terror_state\tprobability\n";
+  
+  unsigned char *Y = new unsigned char [Nu*2]; // 最大受信長
+  unsigned char *X = new unsigned char [Nu];   // 送信コードワード
+  
+  int count = 0;
+  for(int Nu2 = 0; Nu2 <= Nu*2; Nu2++) {
+    if(Nu2 < Nu2min || Nu2 > Nu2max) {
+      // approximate case
+      for(int e = 0; e < 4; e++) {
+        file << Nu2 << "\t";
+        
+        // y=0のバイナリ表現
+        if(Nu2 > 0) {
+          LongToVect(Y, 0, Nu2);
+          for(int i = 0; i < Nu2; i++) file << (int)Y[i];
+        } else {
+          file << "(empty)";
+        }
+        file << "\t";
+        
+        // xi=0のバイナリ表現（コードワード）
+        ICB->Get_CW(X, 0);
+        for(int i = 0; i < Nu; i++) file << (int)X[i];
+        
+        file << "\t" << e << "\t" << std::scientific << std::setprecision(6) 
+             << GENew[Nu2][0][0][e] << "\n";
+        count++;
+      }
+    } else {
+      // exact case
+      long Nu2p = (long)pow(2, Nu2);
+      for(long y = 0; y < Nu2p && y < 100; y++) { // 最初の100個のyのみ出力（ファイルサイズ制限）
+        // yをバイナリに変換
+        LongToVect(Y, y, Nu2);
+        
+        for(int xi = 0; xi < Q; xi++) {
+          // xiのコードワードを取得
+          ICB->Get_CW(X, xi);
+          
+          for(int e = 0; e < 4; e++) {
+            file << Nu2 << "\t";
+            
+            // yのバイナリ表現
+            for(int i = 0; i < Nu2; i++) file << (int)Y[i];
+            file << "\t";
+            
+            // xiのバイナリ表現（コードワード）
+            for(int i = 0; i < Nu; i++) file << (int)X[i];
+            
+            file << "\t" << e << "\t" 
+                 << std::scientific << std::setprecision(6) 
+                 << GENew[Nu2][y][xi][e] << "\n";
+            count++;
+          }
+        }
+      }
+    }
+  }
+  
+  delete [] Y;
+  delete [] X;
+  file.close();
+  printf("# Exported %d GENew entries to %s\n", count, filename);
+}
+
+//================================================================================
+void SLFBAdec::exportAllProbabilityTables(const char* output_dir) {
+  printf("# Exporting all probability tables to directory: %s\n", output_dir);
+  
+  // ディレクトリ作成（簡単な方法）
+  std::string mkdir_cmd = "mkdir -p ";
+  mkdir_cmd += output_dir;
+  system(mkdir_cmd.c_str());
+  
+  // 各テーブルを個別ファイルに出力
+  std::string transition_file = std::string(output_dir) + "/transition_probabilities.txt";
+  std::string gxnew_file = std::string(output_dir) + "/GXNew_table.txt";
+  std::string genew_file = std::string(output_dir) + "/GENew_table.txt";
+  
+  exportTransitionProbabilities(transition_file.c_str());
+  exportGXNewTable(gxnew_file.c_str());
+  exportGENewTable(genew_file.c_str());
+  
+  // サマリーファイルも作成
+  std::string summary_file = std::string(output_dir) + "/probability_tables_summary.txt";
+  std::ofstream summary(summary_file);
+  if (summary.is_open()) {
+    summary << "# SLFBAdec Probability Tables Summary\n";
+    summary << "# Generated on: " << __DATE__ << " " << __TIME__ << "\n\n";
+    
+    summary << "## Parameters\n";
+    summary << "Nu (symbol length): " << Nu << "\n";
+    summary << "Q (codewords): " << Q << "\n";
+    summary << "k-mer length: " << k_mer_length << "\n";
+    summary << "Nu2min: " << Nu2min << "\n";
+    summary << "Nu2max: " << Nu2max << "\n";
+    summary << "Channel parameters: Pi=" << Pi << " Pd=" << Pd << " Ps=" << Ps << " Pt=" << Pt << "\n\n";
+    
+    summary << "## Generated Files\n";
+    summary << "1. transition_probabilities.txt - k-mer dependent transition probabilities\n";
+    summary << "2. GXNew_table.txt - Channel output probabilities P(y|x,e)\n";
+    summary << "3. GENew_table.txt - Error state transition probabilities P(e_(i+1)v|...)\n\n";
+    
+    summary << "## k-mer Statistics\n";
+    summary << "Total k-mers in transition table: " << transition_probs.size() << "\n";
+    
+    // k-merごとの統計
+    if (!transition_probs.empty()) {
+      summary << "\n## Sample k-mers (first 10)\n";
+      int sample_count = 0;
+      for (const auto& kmer_entry : transition_probs) {
+        if (sample_count >= 10) break;
+        summary << kmer_entry.first << ": " << kmer_entry.second.size() << " event types\n";
+        sample_count++;
+      }
+    }
+    
+    summary.close();
+    printf("# Created summary file: %s\n", summary_file.c_str());
+  }
+  
+  printf("# All probability tables exported to: %s\n", output_dir);
 }
 
 //================================================================================
@@ -358,6 +1282,7 @@ void SLFBAdec::CalcPO(int idx){
 
 //================================================================================
 void SLFBAdec::CalcPF(int idx, int Nb2){
+  // Forward確率
   assert(idx>=0 && idx<Ns);
   int  d0,d1;
   int  xi;
@@ -396,6 +1321,7 @@ void SLFBAdec::CalcPF(int idx, int Nb2){
 
 //================================================================================
 void SLFBAdec::CalcPB(int idx, int Nb2){
+  // Backward確率
   assert(idx>=0 && idx<Ns);
   int  d0,d1;
   int  xi;
@@ -434,6 +1360,7 @@ void SLFBAdec::CalcPB(int idx, int Nb2){
 
 //================================================================================
 void SLFBAdec::CalcPD(int idx, int Nb2){
+  //　事後確率
   assert(idx>=0 && idx<Ns);
   int  d0,d1;
   int  xi;
@@ -491,9 +1418,13 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   Nu2min = Nu - (int)ceil( (double)Nu*Pd ) - 2;
   Nu2max = min(Nu2max, Nu*2);
   Nu2min = max(Nu2min, 0   );
+  k_mer_length = 4; // デフォルトk=4、必要に応じて設定可能にする
   printf("# SLFBAdec: Ns=%d (Nu;Nu2min,Nu2max)=(%d(%ld);%d,%d) Nb=%d Q=%d\n",Ns,Nu,Nu2p,Nu2min,Nu2max,Nb,Q);
   printf("# SLFBAdec: (Pi,Pd,Ps,Pt)=(%e,%e,%e,%e) (Dmin,Dmax:Drng)=(%d,%d:%d)\n",
 	 Pi,Pd,Ps,Pt,Dmin,Dmax,Drng);
+  printf("# SLFBAdec: k-mer length=%d\n",k_mer_length);
+  printf("# SLFBAdec: loading transition probabilities\n");
+  loadTransitionProbabilities(k_mer_length);
   assert(Nb%Nu==0);
   assert(Nu<=NuMax);
   assert(ECM->GetM()==Q && ECM->GetN()==Q);
@@ -502,6 +1433,10 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   printf("# SLFBAdec: generating GD & GX\n");
   SetGD();
   SetGX();
+  printf("# SLFBAdec: generating GXNew\n");
+  SetGXNew();
+  printf("# SLFBAdec: generating GENew\n");
+  SetGENew();
   printf("# SLFBAdec: generating factor graph\n");
   SetFG();
 }
@@ -510,6 +1445,8 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
 SLFBAdec::~SLFBAdec(){
   DelGD();
   DelGX();
+  DelGXNew();
+  DelGENew();
   DelFG();
   printf("# SLFBAdec: deleted\n");
 }
