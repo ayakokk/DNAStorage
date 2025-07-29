@@ -78,6 +78,7 @@ int IDSchannel::transmit(unsigned char *Y, const unsigned char *X){
   return N+DR[N]; //TMP
 }
 
+
 //================================================================================
 int    IDSchannel::GetN(){   return N;}
 int    IDSchannel::GetDmin(){return Dmin;}

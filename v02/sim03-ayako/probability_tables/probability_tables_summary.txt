@@ -1,5 +1,5 @@
 # SLFBAdec Probability Tables Summary
-# Generated on: Jul 24 2025 20:07:32
+# Generated on: Jul 28 2025 18:57:48
 
 ## Parameters
 Nu (symbol length): 6

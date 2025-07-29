@@ -321,14 +321,9 @@ void SLFBAdec::SetGXNew(){
           ICB->Get_CW(X,xi);
           x = VectToLong(X,Nu);
           GXNew[ly][y][xi] = new double [4];  // 4つのエラー状態
-          // 修正されたCalcPyxNew関数を使用
-          // 各エラー状態の確率を個別に計算せず、総和を各状態に分配
-          double total_prob = CalcPyxNew(y,x,ly,Nu,0); // 全状態の総確率
-          
-          // lattice.cppに基づく状態分布（近似）
-          double state_weights[4] = {0.7, 0.1, 0.1, 0.1}; // Match, Ins, Del, Sub
+          // 各エラー状態について格子計算による正確な確率を計算
           for(int e=0; e<4; e++){
-            GXNew[ly][y][xi][e] = total_prob * state_weights[e];
+            GXNew[ly][y][xi][e] = CalcPyxNew(y,x,ly,Nu,e);
           }
         } // for xi
       } // for y
@@ -361,7 +356,7 @@ void SLFBAdec::DelGXNew(){
 
 //================================================================================
 double SLFBAdec::CalcPyxNew(long y, long x, int ly, int lx, int error_state){
-  // lattice.cppに基づく格子計算による正確なチャネル確率p(y|x,e)の計算
+  // debugLatticeCalculation()と同じ実装による正確なチャネル確率p(y|x,e)の計算
   assert(lx>0 && ly>=0);
   assert(error_state>=0 && error_state<4);
   
@@ -374,11 +369,57 @@ double SLFBAdec::CalcPyxNew(long y, long x, int ly, int lx, int error_state){
   std::vector<std::vector<std::vector<double>>> F(lx+1, 
     std::vector<std::vector<double>>(ly+1, std::vector<double>(4, 0.0)));
   
-  // 格子の初期化
-  initializeLattice(F, lx, ly);
+  // 初期状態の設定
+  F[0][0][0] = 1.0; // Match状態から開始
   
-  // 動的プログラミングによる格子計算
-  calculateLatticeDP(F, X, Y, lx, ly);
+  // debugLatticeCalculation()と同じ格子計算ロジック
+  for(int n = 0; n <= lx; n++){
+    for(int m = 0; m <= ly; m++){
+      
+      if(n == 0 && m == 0) continue; // 初期状態はスキップ
+      
+      // Match計算（対角線移動: n-1,m-1 -> n,m）
+      if(n > 0 && m > 0 && X[n-1] == Y[m-1]){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 0); // Match=0
+          double match_prob = Psub(X[n-1], Y[m-1]) * Pt;
+          F[n][m][0] += prev_prob * trans_prob * match_prob;
+        }
+      }
+      
+      // Substitution計算（対角線移動: n-1,m-1 -> n,m）
+      if(n > 0 && m > 0 && X[n-1] != Y[m-1]){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 1); // Substitution=1
+          double sub_prob = Psub(X[n-1], Y[m-1]) * Pt * (1.0/3.0);
+          F[n][m][1] += prev_prob * trans_prob * sub_prob;
+        }
+      }
+      
+      // Deletion計算（垂直移動: n-1,m -> n,m）
+      if(n > 0){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n-1][m][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 2); // Deletion=2
+          double del_prob = Pd;
+          F[n][m][2] += prev_prob * trans_prob * del_prob;
+        }
+      }
+      
+      // Insertion計算（水平移動: n,m-1 -> n,m）
+      if(m > 0){
+        for(int prev_e = 0; prev_e < 4; prev_e++){
+          double prev_prob = F[n][m-1][prev_e];
+          double trans_prob = getTransitionProbability(prev_e, 3); // Insertion=3
+          double ins_prob = Pi * (1.0/4.0); // 4つの塩基への等確率挿入
+          F[n][m][3] += prev_prob * trans_prob * ins_prob;
+        }
+      }
+      
+    } // for m
+  } // for n
   
   delete [] X;
   delete [] Y;
@@ -661,45 +702,282 @@ double SLFBAdec::GetGXNew(int Nu2, long y, long xi, int error_state){
 
 //================================================================================
 void SLFBAdec::SetGENew(){
-  // 新しい確率分布の事前計算: P(e_(i+1)v|e_iv, φ0(u'_(i-⌈k/v⌉+1)), φ0(u'_(i-⌈k/v⌉)), φ0(u'_i), φ0(u'_(i+1)), d_iv, d_(i+1)v)
-  long ly2p,x;
-  unsigned char *X = new unsigned char [Nu];
+  // 旧版互換性のため、SetGENewMinimal()を呼び出す
+  SetGENewMinimal();
+}
+
+void SLFBAdec::SetGENewMinimal(){
+  // 段階的ロードアプローチ: 起動時は基本テーブルのみ初期化
+  printf("# SetGENewMinimal: Initializing basic GENew table structure\n");
+  
+  // まず事前計算済みデータの読み込みを試行
+  bool precomputed_loaded = LoadAllPrecomputedGENew("precomputed_genew");
+  
+  // テーブル構造のみ初期化、中身は後で必要に応じて計算
   GENew = new double *** [Nu*2+1];
+  
   for(int ly=0;ly<=Nu*2;ly++){
     if(ly<Nu2min || ly>Nu2max){
-      // approximate
+      // approximate: 軽量な近似値のみ事前計算
       GENew[ly]    = new double ** [1];
       GENew[ly][0] = new double * [1];
       GENew[ly][0][0] = new double [4];  // 4つのエラー状態
+      
       // k-merコンテキスト依存の基本確率（簡略版）
       double base_prob = (ly<Nu)? pow(Pd,Nu-ly) : pow(Pi,ly-Nu);
-      // 遷移確率行列（eLattice_v7.cppと同じ）
       GENew[ly][0][0][0] = base_prob * 0.7;  // Match状態継続確率
       GENew[ly][0][0][1] = base_prob * 0.1;  // Insertion状態遷移確率  
       GENew[ly][0][0][2] = base_prob * 0.1;  // Deletion状態遷移確率
       GENew[ly][0][0][3] = base_prob * 0.1;  // Substitution状態遷移確率
     } else {
-      // exact
-      ly2p = (long)pow(2,ly);
+      // exact: 構造のみ初期化、値は未計算状態
+      long ly2p = (long)pow(2,ly);
       GENew[ly] = new double ** [ly2p];
+      
       for(long y=0;y<ly2p;y++){
         GENew[ly][y] = new double * [Q];
         for(int xi=0;xi<Q;xi++){
-          ICB->Get_CW(X,xi);
-          x = VectToLong(X,Nu);
           GENew[ly][y][xi] = new double [4];  // 4つのエラー状態
-          // k-merコンテキスト依存の確率計算
-          double base_prob = CalcPexNew(y,x,ly,Nu);
-          // 各エラー状態への遷移確率を設定
-          GENew[ly][y][xi][0] = base_prob * 0.7;  // Match状態継続
-          GENew[ly][y][xi][1] = base_prob * 0.1;  // Insertion状態遷移
-          GENew[ly][y][xi][2] = base_prob * 0.1;  // Deletion状態遷移
-          GENew[ly][y][xi][3] = base_prob * 0.1;  // Substitution状態遷移
-        } // for xi
-      } // for y
-    } // if ly
-  } // for ly
+          
+          // 事前計算済みデータが読み込まれていない場合は-1.0で初期化
+          if(genew_loaded_ly.find(ly) == genew_loaded_ly.end()) {
+            for(int e=0; e<4; e++){
+              GENew[ly][y][xi][e] = -1.0;  // 未計算を示す
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  if(precomputed_loaded) {
+    printf("# SetGENewMinimal: Using precomputed data\n");
+  } else {
+    printf("# SetGENewMinimal: Precomputed data not found, will compute on-demand\n");
+  }
+  
+  printf("# SetGENewMinimal: Structure initialized for ly=0 to %d\n", Nu*2);
+}
+
+void SLFBAdec::ExpandGENew(int ly){
+  // 特定のlyについて格子計算を実行して拡張
+  if(ly < Nu2min || ly > Nu2max) {
+    // 範囲外の場合は何もしない（既に近似値が設定済み）
+    return;
+  }
+  
+  if(genew_loaded_ly.find(ly) != genew_loaded_ly.end()) {
+    // 既に計算済みの場合はスキップ
+    return;
+  }
+  
+  printf("# ExpandGENew: Computing exact values for ly=%d\n", ly);
+  
+  long ly2p = (long)pow(2,ly);
+  unsigned char *X = new unsigned char [Nu];
+  long x;
+  int calculations = 0;
+  
+  for(long y=0;y<ly2p;y++){
+    for(int xi=0;xi<Q;xi++){
+      ICB->Get_CW(X,xi);
+      x = VectToLong(X,Nu);
+      
+      // 各エラー状態について個別に格子計算による正確な確率を計算
+      for(int error_state=0; error_state<4; error_state++){
+        GENew[ly][y][xi][error_state] = CalcPexNewWithErrorState(y,x,ly,Nu,error_state);
+        calculations++;
+      }
+    }
+    
+    // 進捗報告（大きなlyの場合）
+    if(ly >= 6 && y % 32 == 0) {
+      printf("# ExpandGENew: ly=%d, progress: %ld/%ld (%.1f%%)\n", 
+             ly, y, ly2p, 100.0*y/ly2p);
+    }
+  }
+  
+  // 完了をマーク
+  genew_loaded_ly.insert(ly);
+  
+  printf("# ExpandGENew: Completed ly=%d with %d calculations\n", ly, calculations);
   delete [] X;
+}
+
+void SLFBAdec::PrecomputeGENewForLy(int ly){
+  // 事前計算専用: 制限なしで完全な格子計算を実行
+  if(ly < Nu2min || ly > Nu2max) {
+    printf("# PrecomputeGENewForLy: ly=%d is out of range [%d,%d], skipping\n", ly, Nu2min, Nu2max);
+    return;
+  }
+  
+  if(genew_loaded_ly.find(ly) != genew_loaded_ly.end()) {
+    printf("# PrecomputeGENewForLy: ly=%d already computed\n", ly);
+    return;
+  }
+  
+  printf("# PrecomputeGENewForLy: Starting complete computation for ly=%d\n", ly);
+  
+  long ly2p = (long)pow(2,ly);
+  unsigned char *X = new unsigned char [Nu];
+  long x;
+  int calculations = 0;
+  int total_calculations = ly2p * Q * 4;
+  
+  auto start_time = std::chrono::high_resolution_clock::now();
+  
+  for(long y=0;y<ly2p;y++){
+    for(int xi=0;xi<Q;xi++){
+      ICB->Get_CW(X,xi);
+      x = VectToLong(X,Nu);
+      
+      // 各エラー状態について個別に格子計算による正確な確率を計算（制限なし）
+      for(int error_state=0; error_state<4; error_state++){
+        GENew[ly][y][xi][error_state] = CalcPexNewWithErrorState(y,x,ly,Nu,error_state);
+        calculations++;
+      }
+    }
+    
+    // 進捗報告
+    if(y % std::max(1L, ly2p/20) == 0) {
+      auto current_time = std::chrono::high_resolution_clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(current_time - start_time);
+      double progress = 100.0 * calculations / total_calculations;
+      printf("# PrecomputeGENewForLy: ly=%d, progress: %.1f%% (%d/%d), elapsed: %llds\n", 
+             ly, progress, calculations, total_calculations, elapsed.count());
+    }
+  }
+  
+  // 完了をマーク
+  genew_loaded_ly.insert(ly);
+  
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto total_elapsed = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
+  
+  printf("# PrecomputeGENewForLy: ly=%d completed with %d calculations in %llds\n", 
+         ly, calculations, total_elapsed.count());
+  delete [] X;
+}
+
+void SLFBAdec::SaveGENewToFile(int ly, const char* filename){
+  if(ly < Nu2min || ly > Nu2max) {
+    printf("# SaveGENewToFile: ly=%d out of range, skipping\n", ly);
+    return;
+  }
+  
+  printf("# SaveGENewToFile: Saving ly=%d to %s\n", ly, filename);
+  
+  std::ofstream file(filename, std::ios::binary);
+  if(!file.is_open()) {
+    printf("# SaveGENewToFile: Error opening file %s\n", filename);
+    return;
+  }
+  
+  // ヘッダー情報を保存
+  file.write(reinterpret_cast<const char*>(&ly), sizeof(ly));
+  file.write(reinterpret_cast<const char*>(&Nu), sizeof(Nu));
+  file.write(reinterpret_cast<const char*>(&Q), sizeof(Q));
+  
+  long ly2p = (long)pow(2,ly);
+  file.write(reinterpret_cast<const char*>(&ly2p), sizeof(ly2p));
+  
+  // データを保存
+  for(long y=0; y<ly2p; y++) {
+    for(int xi=0; xi<Q; xi++) {
+      file.write(reinterpret_cast<const char*>(GENew[ly][y][xi]), sizeof(double) * 4);
+    }
+  }
+  
+  file.close();
+  
+  // ファイルサイズを確認
+  std::ifstream check(filename, std::ios::binary | std::ios::ate);
+  long file_size = check.tellg();
+  check.close();
+  
+  printf("# SaveGENewToFile: Saved ly=%d (%ld entries) to %s (%.2f MB)\n", 
+         ly, ly2p * Q * 4, filename, file_size / (1024.0 * 1024.0));
+}
+
+bool SLFBAdec::LoadGENewFromFile(int ly, const char* filename){
+  if(ly < Nu2min || ly > Nu2max) {
+    return false;
+  }
+  
+  std::ifstream file(filename, std::ios::binary);
+  if(!file.is_open()) {
+    return false;
+  }
+  
+  // ヘッダー情報を読み込んで検証
+  int file_ly, file_Nu, file_Q;
+  long file_ly2p;
+  
+  file.read(reinterpret_cast<char*>(&file_ly), sizeof(file_ly));
+  file.read(reinterpret_cast<char*>(&file_Nu), sizeof(file_Nu));
+  file.read(reinterpret_cast<char*>(&file_Q), sizeof(file_Q));
+  file.read(reinterpret_cast<char*>(&file_ly2p), sizeof(file_ly2p));
+  
+  if(file_ly != ly || file_Nu != Nu || file_Q != Q) {
+    printf("# LoadGENewFromFile: Parameter mismatch in %s\n", filename);
+    file.close();
+    return false;
+  }
+  
+  // データを読み込み
+  for(long y=0; y<file_ly2p; y++) {
+    for(int xi=0; xi<Q; xi++) {
+      file.read(reinterpret_cast<char*>(GENew[ly][y][xi]), sizeof(double) * 4);
+    }
+  }
+  
+  file.close();
+  
+  // 読み込み完了をマーク
+  genew_loaded_ly.insert(ly);
+  
+  printf("# LoadGENewFromFile: Loaded ly=%d from %s\n", ly, filename);
+  return true;
+}
+
+bool SLFBAdec::LoadAllPrecomputedGENew(const char* precomputed_dir){
+  printf("# LoadAllPrecomputedGENew: Loading from %s\n", precomputed_dir);
+  
+  // メタデータファイルを読み込み
+  std::string metadata_file = std::string(precomputed_dir) + "/metadata.txt";
+  std::ifstream meta(metadata_file);
+  if(!meta.is_open()) {
+    printf("# LoadAllPrecomputedGENew: Metadata file not found: %s\n", metadata_file.c_str());
+    return false;
+  }
+  
+  std::string line;
+  int loaded_count = 0;
+  
+  while(std::getline(meta, line)) {
+    if(line.empty() || line[0] == '#') continue;
+    
+    if(line.substr(0, 7) == "file_ly") {
+      // file_ly3=GENew_ly3.bin の形式を解析
+      size_t eq_pos = line.find('=');
+      if(eq_pos != std::string::npos) {
+        std::string ly_part = line.substr(7, eq_pos - 7);
+        std::string filename = line.substr(eq_pos + 1);
+        
+        int ly = std::stoi(ly_part);
+        std::string full_path = std::string(precomputed_dir) + "/" + filename;
+        
+        if(LoadGENewFromFile(ly, full_path.c_str())) {
+          loaded_count++;
+        }
+      }
+    }
+  }
+  
+  meta.close();
+  
+  printf("# LoadAllPrecomputedGENew: Loaded %d precomputed ly ranges\n", loaded_count);
+  return loaded_count > 0;
 }
 
 //================================================================================
@@ -725,103 +1003,223 @@ void SLFBAdec::DelGENew(){
 }
 
 //================================================================================
-double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
-  // 実験データベースに基づくk-merコンテキスト依存のエラー状態遷移確率計算
-  // P(e_(i+1)v|e_iv, φ0(u'_(i-⌈k/v⌉+1)), φ0(u'_(i-⌈k/v⌉)), φ0(u'_i), φ0(u'_(i+1)), d_iv, d_(i+1)v)
+// 格子計算のためのヘルパー関数
+void SLFBAdec::outputLatticeDebug(
+    const std::vector<std::vector<std::vector<double>>>& lattice,
+    int target_i, int target_j, const std::string& description,
+    std::ofstream& debug_file) {
+    
+    std::vector<std::string> event_names = {"Match", "Ins", "Del", "Sub"};
+    
+    debug_file << "\n=== " << description << " ===" << std::endl;
+    
+    int start_i = (target_i >= 0) ? target_i : 0;
+    int end_i = (target_i >= 0) ? target_i : static_cast<int>(lattice.size()) - 1;
+    
+    for (int i = start_i; i <= end_i && i < static_cast<int>(lattice.size()); i++) {
+        for (int j = 0; j < static_cast<int>(lattice[i].size()); j++) {
+            bool has_nonzero = false;
+            std::string line = "F[" + std::to_string(i) + "][" + std::to_string(j) + "]: ";
+            
+            for (int e = 0; e < 4; e++) {
+                if (lattice[i][j][e] > 1e-10) {  // 極小値をフィルタ
+                    if (has_nonzero) line += ", ";
+                    line += event_names[e] + "=" + std::to_string(lattice[i][j][e]);
+                    has_nonzero = true;
+                }
+            }
+            
+            if (has_nonzero) {
+                debug_file << "  " << line << std::endl;
+            }
+        }
+    }
+}
+
+double SLFBAdec::CalcPexNewWithErrorState(long y, long x, int ly, int lx, int target_error_state){
+  // eLattice_v7.cppと同じk-merコンテキスト依存の格子計算による正確な遷移確率計算
+  // 特定のエラー状態での終端確率を返す
   assert(lx>0 && ly>=0);
+  assert(target_error_state>=0 && target_error_state<4);
   
-  if(ly==0) return pow(Pd,lx);
+  if(ly==0) {
+    // 削除のみが可能な場合
+    return (target_error_state == 2) ? pow(Pd,lx) : 0.0;
+  }
   
-  long x1,y1;
-  double ret,qt,qi,qd;
+  // 入力配列と観測配列を準備
   unsigned char *X = new unsigned char [lx];
   unsigned char *Y = new unsigned char [ly];
   LongToVect(X,x,lx);
   LongToVect(Y,y,ly);
   
-  if(lx==1){
-    if(ly==1){
-      // k-merを抽出してテーブルから確率を取得
-      std::string current_kmer = extractKmerFromSequence(X, lx, 0, k_mer_length);
-      
-      // デフォルト確率（実験データがない場合）
-      double match_prob = 0.7, sub_prob = 0.1;
-      
-      // 実験データから確率を取得
-      if (transition_probs.find(current_kmer) != transition_probs.end()) {
-        // 前のイベントを0(Match)と仮定、より正確には前の状態を追跡する必要がある
-        auto& probs = transition_probs[current_kmer][0]; // Match から遷移と仮定
-        match_prob = probs[0]; // Match確率
-        sub_prob = probs[3];   // Substitution確率
-      }
-      
-      if(X[0]==Y[0]){
-        ret = Psub(X[0],Y[0]) * Pt * match_prob;  // Match状態継続
-      } else {
-        ret = Psub(X[0],Y[0]) * Pt * sub_prob * (1.0/3.0);  // Substitution状態遷移
-      }
-    } else if(ly==2) {
-      // k-merを抽出してテーブルから挿入確率を取得
-      std::string current_kmer = extractKmerFromSequence(X, lx, 0, k_mer_length);
-      double ins_prob = 0.1; // デフォルト
-      
-      if (transition_probs.find(current_kmer) != transition_probs.end()) {
-        auto& probs = transition_probs[current_kmer][0]; // Match から遷移と仮定
-        ins_prob = probs[1]; // Insertion確率
-      }
-      
-      ret = Psub(X[0],Y[0]) * Psub(X[0],Y[1]) * Pi * ins_prob * (1.0/4.0);  // Insertion状態遷移
-    } else {
-      assert(ly>=3); 
-      ret = 0.0;
-    }
-  } else {
-    x1 = VectToLong(&X[1],lx-1);
-    
-    // k-merを抽出してテーブルから確率を取得
-    std::string current_kmer = extractKmerFromSequence(X, lx, 0, k_mer_length);
-    
-    // デフォルト確率
-    double match_prob = 0.7, ins_prob = 0.1, del_prob = 0.1, sub_prob = 0.1;
-    
-    // 実験データから確率を取得
-    if (transition_probs.find(current_kmer) != transition_probs.end()) {
-      auto& probs = transition_probs[current_kmer][0]; // Match から遷移と仮定
-      match_prob = probs[0]; // Match確率
-      ins_prob = probs[1];   // Insertion確率
-      del_prob = probs[2];   // Deletion確率
-      sub_prob = probs[3];   // Substitution確率
-    }
-    
-    // k-merコンテキストを考慮したMatch/Substitution
-    if(X[0]==Y[0]){
-      qt = Psub(X[0],Y[0]) * Pt * match_prob;  // Match継続
-    } else {
-      qt = Psub(X[0],Y[0]) * Pt * sub_prob * (1.0/3.0);  // Substitution遷移
-    }
-    y1 = (ly==1)? 0 : VectToLong(&Y[1],ly-1);
-    qt *= CalcPexNew(y1,x1,ly-1,lx-1);
-    
-    // k-merコンテキストを考慮したInsertion
-    if(ly<2){
-      qi = 0.0;
-    } else {
-      qi = Psub(X[0],Y[0]) * Psub(X[0],Y[1]) * Pi * ins_prob * (1.0/4.0);  // Insertion遷移
-      y1 = (ly==2)? 0 : VectToLong(&Y[2],ly-2);
-      qi *= CalcPexNew(y1,x1,ly-2,lx-1);
-    }
-    
-    // k-merコンテキストを考慮したDeletion  
-    qd = Pd * del_prob;  // Deletion遷移
-    y1 = y;
-    qd *= CalcPexNew(y1,x1,ly,lx-1);
-    
-    ret = qt + qi + qd;
+  // eLattice_v7.cppと同じ格子計算アルゴリズム
+  // 3D格子: [i][j][event] -> probability
+  int max_i = lx;
+  int max_j = ly;
+  
+  std::vector<std::vector<std::vector<double>>> lattice(
+      max_i + 1,
+      std::vector<std::vector<double>>(
+          max_j + 1,
+          std::vector<double>(4, 0.0)
+      )
+  );
+  
+  // デバッグファイルの準備（target_error_state情報を含む）
+  std::string x_binary = "";
+  std::string y_binary = "";
+  
+  // xのバイナリ変換
+  for(int i = 0; i < lx; i++) {
+    x_binary += (char)('0' + X[i]);
   }
+  
+  // yのバイナリ変換  
+  for(int i = 0; i < ly; i++) {
+    y_binary += (char)('0' + Y[i]);
+  }
+  
+  std::string debug_filename = "GENew_lattice_debug/GENew_" + std::to_string(lx) + "_" + 
+                               x_binary + "_" + y_binary + "_state" + std::to_string(target_error_state) + ".txt";
+  std::ofstream debug_file(debug_filename);
+  
+  debug_file << "=== GENew k-merコンテキスト依存格子計算 ===" << std::endl;
+  debug_file << "入力長: " << lx << ", 観測長: " << ly << ", 目標エラー状態: " << target_error_state << std::endl;
+  debug_file << "入力: ";
+  for(int i = 0; i < lx; i++) {
+    debug_file << (char)('A' + X[i]);
+  }
+  debug_file << " (バイナリ: " << x_binary << ", 数値: " << x << ")" << std::endl;
+  debug_file << "観測: ";
+  for(int i = 0; i < ly; i++) {
+    debug_file << (char)('A' + Y[i]);
+  }
+  debug_file << " (バイナリ: " << y_binary << ", 数値: " << y << ")" << std::endl;
+  
+  // 初期化: 開始点は[0][0][Match]
+  lattice[0][0][0] = 1.0;
+  
+  debug_file << "\n初期化: F[0][0][Match] = 1.0" << std::endl;
+  
+  // eLattice_v7.cppと同じ格子計算アルゴリズム
+  for (int i = 0; i <= max_i; i++) {
+      for (int j = 0; j <= max_j; j++) {
+          for (int current_event = 0; current_event < 4; current_event++) {
+              
+              if (lattice[i][j][current_event] <= 1e-15) continue; // 極小値を無視
+              
+              double current_prob = lattice[i][j][current_event];
+              
+              // k-merコンテキストを抽出（eLattice_v7.cppと同じ方法）
+              std::string current_kmer = "";
+              if (i > 0 && i <= lx) {
+                  current_kmer = extractKmerFromSequence(X, lx, i-1, k_mer_length);
+              } else {
+                  current_kmer = std::string(k_mer_length, 'A'); // デフォルト
+              }
+              
+              // k-mer依存の遷移確率を取得
+              std::vector<double> trans_probs = {0.7, 0.1, 0.1, 0.1}; // デフォルト値
+              if (transition_probs.find(current_kmer) != transition_probs.end() &&
+                  transition_probs[current_kmer].find(current_event) != transition_probs[current_kmer].end()) {
+                  trans_probs = transition_probs[current_kmer][current_event];
+              }
+              
+              debug_file << "\nF[" << i << "][" << j << "][" << current_event 
+                        << "] = " << std::scientific << current_prob << " (k-mer: " << current_kmer << ")" << std::endl;
+              
+              // Match遷移: (i+1, j+1, Match) - eLattice_v7.cppと同じロジック
+              if (i + 1 <= max_i && j + 1 <= max_j && i < lx && j < ly) {
+                  if (X[i] == Y[j] && trans_probs[0] > 0) {
+                      double match_prob = current_prob * trans_probs[0] * Psub(X[i], Y[j]) * Pt;
+                      lattice[i+1][j+1][0] += match_prob;
+                      if (match_prob > 1e-15) {
+                          debug_file << "  Match遷移: F[" << (i+1) << "][" << (j+1) << "][0] += " 
+                                    << std::scientific << match_prob << std::endl;
+                      }
+                  }
+              }
+              
+              // Insertion遷移: (i, j+1, Insertion)
+              if (j + 1 <= max_j && trans_probs[1] > 0) {
+                  double ins_prob = current_prob * trans_probs[1] * Pi * 0.25; // 4つの塩基への等確率
+                  lattice[i][j+1][1] += ins_prob;
+                  if (ins_prob > 1e-15) {
+                      debug_file << "  Insertion遷移: F[" << i << "][" << (j+1) << "][1] += " 
+                                << std::scientific << ins_prob << std::endl;
+                  }
+              }
+              
+              // Deletion遷移: (i+1, j, Deletion)
+              if (i + 1 <= max_i && trans_probs[2] > 0) {
+                  double del_prob = current_prob * trans_probs[2] * Pd;
+                  lattice[i+1][j][2] += del_prob;
+                  if (del_prob > 1e-15) {
+                      debug_file << "  Deletion遷移: F[" << (i+1) << "][" << j << "][2] += " 
+                                << std::scientific << del_prob << std::endl;
+                  }
+              }
+              
+              // Substitution遷移: (i+1, j+1, Substitution)
+              if (i + 1 <= max_i && j + 1 <= max_j && i < lx && j < ly) {
+                  if (X[i] != Y[j] && trans_probs[3] > 0) {
+                      double sub_prob = current_prob * trans_probs[3] * Psub(X[i], Y[j]) * Pt * (1.0/3.0);
+                      lattice[i+1][j+1][3] += sub_prob;
+                      if (sub_prob > 1e-15) {
+                          debug_file << "  Substitution遷移: F[" << (i+1) << "][" << (j+1) << "][3] += " 
+                                    << std::scientific << sub_prob << std::endl;
+                      }
+                  }
+              }
+          }
+      }
+  }
+  
+  // 終了位置での特定エラー状態の確率を取得（eLattice_v7.cppと同じ方法）
+  int final_i = lx;
+  int final_j = ly;
+  
+  // 境界チェック
+  if (final_i >= static_cast<int>(lattice.size()) || 
+      final_j >= static_cast<int>(lattice[0].size()) ||
+      final_i < 0 || final_j < 0) {
+      debug_file << "\n⚠️ 警告: 終了位置が範囲外 [" << final_i << "][" << final_j << "]" << std::endl;
+      debug_file.close();
+      delete [] X;
+      delete [] Y;
+      return 0.0;
+  }
+  
+  double result = lattice[final_i][final_j][target_error_state];
+  
+  debug_file << "\n=== 最終結果 ===" << std::endl;
+  debug_file << "終了位置: [" << final_i << "][" << final_j << "]" << std::endl;
+  debug_file << "目標エラー状態 " << target_error_state << " の確率: " 
+            << std::scientific << result << std::endl;
+  
+  // 全エラー状態の確率も出力（参考用）
+  debug_file << "全エラー状態確率:" << std::endl;
+  std::vector<std::string> state_names = {"Match", "Insertion", "Deletion", "Substitution"};
+  for (int e = 0; e < 4; e++) {
+      debug_file << "  " << state_names[e] << " (" << e << "): " 
+                << std::scientific << lattice[final_i][final_j][e] << std::endl;
+  }
+  
+  debug_file.close();
   
   delete [] X;
   delete [] Y;
-  return ret;
+  return result;
+}
+
+double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
+  // 後方互換性のため：全エラー状態の確率の合計を返す
+  double total_prob = 0.0;
+  for(int e = 0; e < 4; e++){
+      total_prob += CalcPexNewWithErrorState(y, x, ly, lx, e);
+  }
+  return total_prob;
 }
 
 //================================================================================
@@ -829,6 +1227,18 @@ double SLFBAdec::GetGENew(int Nu2, long y, long xi){
   assert(Nu2>=0 && Nu2<=2*Nu);
   assert(y >=0);
   assert(xi>=0 && xi<Q);
+  
+  // 段階的ロードアプローチ: 必要に応じてExpandGENewを呼び出し
+  if(Nu2>=Nu2min && Nu2<=Nu2max) {
+    // exact範囲内で未計算の場合は計算を実行
+    if(genew_loaded_ly.find(Nu2) == genew_loaded_ly.end()) {
+      // 最初の値が-1.0（未計算）かチェック
+      if(GENew[Nu2][0][0][0] < 0.0) {
+        printf("# GetGENew: On-demand expansion for Nu2=%d\n", Nu2);
+        ExpandGENew(Nu2);
+      }
+    }
+  }
   
   // この関数はエラー状態の事後確率の合計を返す（正規化前）
   double total_prob = 0.0;
@@ -850,7 +1260,9 @@ double SLFBAdec::GetGENew(int Nu2, long y, long xi){
 
 //================================================================================
 void SLFBAdec::loadTransitionProbabilities(int k) {
-  // 確率テーブルを読み込み (eLattice_v7.cppと同じ方法)
+  // 安全な確率テーブル読み込み（段階的に実装）
+  printf("# Loading k-mer transition probabilities (k=%d)\n", k);
+  
   std::string base_path = "DNArSim-main/simulator/probEdit/k" + std::to_string(k) + "/";
   
   std::vector<std::string> event_files = {
@@ -861,6 +1273,10 @@ void SLFBAdec::loadTransitionProbabilities(int k) {
   };
   
   std::vector<std::string> event_names = {"Match", "Insertion", "Deletion", "Substitution"};
+  
+  // メモリ使用量を制限するため、段階的に読み込み
+  int total_loaded = 0;
+  const int MAX_KMERS = 100; // 一時的に制限
   
   for (int prev_event = 0; prev_event < 4; prev_event++) {
     std::string full_path = base_path + event_files[prev_event];
@@ -875,14 +1291,33 @@ void SLFBAdec::loadTransitionProbabilities(int k) {
     std::string line;
     int line_count = 0;
     
-    while (std::getline(file, line)) {
+    // ファイルサイズチェック（安全性向上）
+    file.seekg(0, std::ios::end);
+    std::streampos fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    if (fileSize > 1000000) { // 1MB以上の場合は警告
+      printf("# Warning: Large file detected (%ld bytes), limiting reads\n", (long)fileSize);
+    }
+    
+    while (std::getline(file, line) && line_count < MAX_KMERS) {
+      // 空行やコメント行をスキップ
+      if (line.empty() || line[0] == '#') continue;
+      
       std::istringstream iss(line);
       std::string kmer;
       double ins, del, sub, err, match;
       
       if (iss >> kmer >> ins >> del >> sub >> err >> match) {
-        transition_probs[kmer][prev_event] = {match, ins, del, sub}; // Match, Ins, Del, Sub の順
-        line_count++;
+        // 数値の妥当性チェック
+        if (match >= 0.0 && match <= 1.0 && ins >= 0.0 && ins <= 1.0 && 
+            del >= 0.0 && del <= 1.0 && sub >= 0.0 && sub <= 1.0) {
+          transition_probs[kmer][prev_event] = {match, ins, del, sub};
+          line_count++;
+          total_loaded++;
+        } else {
+          printf("# Warning: Invalid probabilities in line: %s\n", line.c_str());
+        }
       }
     }
     
@@ -890,7 +1325,11 @@ void SLFBAdec::loadTransitionProbabilities(int k) {
     file.close();
   }
   
-  printf("# Total k-mers in transition table: %zu\n", transition_probs.size());
+  printf("# Total k-mers loaded: %d (table size: %zu)\n", total_loaded, transition_probs.size());
+  
+  // メモリ使用量の簡易チェック
+  size_t estimated_memory = transition_probs.size() * 4 * 4 * sizeof(double);
+  printf("# Estimated memory usage: %.2f KB\n", estimated_memory / 1024.0);
 }
 
 //================================================================================
@@ -1419,6 +1858,7 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   Nu2max = min(Nu2max, Nu*2);
   Nu2min = max(Nu2min, 0   );
   k_mer_length = 4; // デフォルトk=4、必要に応じて設定可能にする
+  genew_loaded_ly.clear(); // 段階的ロード状況の初期化
   printf("# SLFBAdec: Ns=%d (Nu;Nu2min,Nu2max)=(%d(%ld);%d,%d) Nb=%d Q=%d\n",Ns,Nu,Nu2p,Nu2min,Nu2max,Nb,Q);
   printf("# SLFBAdec: (Pi,Pd,Ps,Pt)=(%e,%e,%e,%e) (Dmin,Dmax:Drng)=(%d,%d:%d)\n",
 	 Pi,Pd,Ps,Pt,Dmin,Dmax,Drng);

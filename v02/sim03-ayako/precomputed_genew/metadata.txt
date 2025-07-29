@@ -1,0 +1,16 @@
+# GENew Precomputed Data Metadata
+# Generated on: Jul 29 2025 11:35:00
+Nu=6
+Q=18
+Pi=4.000000e-03
+Pd=4.000000e-03
+Ps=4.000000e-03
+Nu2min=3
+Nu2max=9
+k_mer_length=4
+file_ly3=GENew_ly3.bin
+file_ly4=GENew_ly4.bin
+file_ly5=GENew_ly5.bin
+file_ly6=GENew_ly6.bin
+file_ly7=GENew_ly7.bin
+file_ly8=GENew_ly8.bin

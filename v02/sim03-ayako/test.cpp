@@ -18,7 +18,6 @@ int main(){
   printf("====================================================\n");
 
   // パラメータ設定
-  const char *icb_dir = "ICB/ex01";
   double Pi = 0.05;  // 挿入確率
   double Pd = 0.05;  // 削除確率 
   double Ps = 0.05;  // 置換確率

@@ -1,6 +1,8 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <fstream>
+#include <set>
 
 class SLFBAdec {
 private:
@@ -16,6 +18,7 @@ private:
   // k-mer依存遷移確率テーブル: [kmer][previous_event] -> [next_event_probabilities]
   std::map<std::string, std::map<int, std::vector<double>>> transition_probs;
   int    k_mer_length;  // k-merの長さ
+  std::set<int> genew_loaded_ly;  // 既に読み込み済みのlyを記録
   double **GD;          // [Drng][Drng]: P(d_Nu | d_0)
   double ***GX;         // [Nu2][y][x]:  P(y|x,d0,d1)
   double ****GXNew;      // [Nu2][y][x][e]:  P(y|x,e) 新しい確率分布（イベント条件付き）
@@ -58,8 +61,14 @@ private:
   double getTransitionProbability(int prev_state, int curr_state);
   double GetGXNew(int Nu2, long y, long xi, int error_state);
   void SetGENew();
+  void SetGENewMinimal();     // 最小限のテーブル初期化
+  void ExpandGENew(int ly);   // 必要な ly のみ拡張
   void DelGENew();
-  double CalcPexNew(long y, long x, int ly, int lx);  // P(e_(i+1)v|...)
+  double CalcPexNew(long y, long x, int ly, int lx);  // P(e_(i+1)v|...) 後方互換性用
+  double CalcPexNewWithErrorState(long y, long x, int ly, int lx, int target_error_state);  // エラー状態別確率計算
+  void outputLatticeDebug(const std::vector<std::vector<std::vector<double>>>& lattice,
+                         int target_i, int target_j, const std::string& description,
+                         std::ofstream& debug_file);
   double GetGENew(int Nu2, long y, long xi);
   // k-mer確率テーブル関連メソッド
   void loadTransitionProbabilities(int k);
@@ -87,4 +96,9 @@ public:
   void exportAllProbabilityTables(const char* output_dir);
   // 格子計算デバッグ用メソッド
   void debugLatticeCalculation(long y, long x, int ly, int lx, const char* filename);
+  // 事前計算システム用メソッド
+  void PrecomputeGENewForLy(int ly);  // 事前計算専用（制限なし完全計算）
+  void SaveGENewToFile(int ly, const char* filename);    // バイナリファイル保存
+  bool LoadGENewFromFile(int ly, const char* filename);  // バイナリファイル読み込み
+  bool LoadAllPrecomputedGENew(const char* precomputed_dir);  // 事前計算済みデータ一括読み込み
 };
