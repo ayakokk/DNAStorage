@@ -22,7 +22,7 @@ int convert_dna_to_bits(const std::string& dna_result, unsigned char* bits, int 
 
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 1
+#define WCmax 100000
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 
@@ -74,7 +74,7 @@ public:
             
             // Execute Julia server
             execlp("julia", "julia", 
-                   "/Users/ayako/research/calc_prob/DNArSim-main/simulator/dna_server.jl",
+                   "DNArSim-main/simulator/dna_server.jl",
                    (char*)NULL);
             
             // If we reach here, exec failed
@@ -196,22 +196,21 @@ int main(int argc, char *argv[]){
   char *fncb    = new char [BSIZE];
   char *fnconst = new char [BSIZE];
   char *fncm    = new char [BSIZE];
-  if(argc!=7){
-    fprintf(stderr,"Usage: %s <ICB_dir> <N> <Pi> <Pd> <Ps> <seed|-1>\n",argv[0]);
+  if(argc!=4){
+    fprintf(stderr,"Usage: %s <ICB_dir> <N> <seed|-1>\n",argv[0]);
     return 1;
   } // if
   fn   =      argv[1];
   N    = atoi(argv[2]);
-  Pi   = atof(argv[3]);
-  Pd   = atof(argv[4]);
-  Ps   = atof(argv[5]);
-  seed = atoi(argv[6]);
+  seed = atoi(argv[3]);
+  // DNA channel parameters (fixed for Julia simulator)
+  Pi   = 0.004; // Dummy IDS values - actual probabilities from GENew/GXNew tables
+  Pd   = 0.004;
+  Ps   = 0.004;
   if(seed==-1) seed = (int)time(NULL);
   srandom(seed);
   assert(N>0);
-  assert(Pi>=0.0 && Pi<0.5);
-  assert(Pd>=0.0 && Pd<0.5);
-  assert(Ps>=0.0 && Ps<0.5);
+  // IDS parameter checks removed - using DNA channel model
   snprintf(fncb,   BSIZE,"%s/cb.txt",        fn);  // inner codebook (in)
   snprintf(fnconst,BSIZE,"%s/constraint.txt",fn);  // constraints (in)
   snprintf(fncm,   BSIZE,"%s/EncCM.bin",     fn);  // encoding channel matrix (in)
@@ -220,11 +219,12 @@ int main(int argc, char *argv[]){
   Q    = ICB->Get_numCW();
   Nu   = ICB->Get_Nu();
   Nb   = N*Nu;
-  printf("# Q=%d N=%d Nu=%d Nb=%d (Pi,Pd,Ps)=(%e,%e,%e) [%d]\n",Q,N,Nu,Nb,Pi,Pd,Ps,seed);
+  printf("# Q=%d N=%d Nu=%d Nb=%d DNA_Channel [%d]\n",Q,N,Nu,Nb,seed);
   printf("# ICB:   %s\n",fncb);
   printf("# Const: %s\n",fnconst);
   printf("# EncCM: %s\n",fncm);
   class ChannelMatrix *ECM = new class ChannelMatrix(fncm);
+  // IDSchannel with dummy parameters - actual probabilities from Julia DNA simulator
   class IDSchannel    *CH  = new class IDSchannel(Nb,Pi,Pd,Ps);
   class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
   class ChannelMatrix *DCM = new class ChannelMatrix(Q,(int)pow(Q,OutListSize));

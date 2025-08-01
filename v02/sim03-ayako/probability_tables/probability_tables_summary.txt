@@ -1,5 +1,5 @@
 # SLFBAdec Probability Tables Summary
-# Generated on: Jul 28 2025 18:57:48
+# Generated on: Aug  1 2025 13:01:52
 
 ## Parameters
 Nu (symbol length): 6
@@ -15,7 +15,7 @@ Channel parameters: Pi=0.05 Pd=0.05 Ps=0.05 Pt=0.9
 3. GENew_table.txt - Error state transition probabilities P(e_(i+1)v|...)
 
 ## k-mer Statistics
-Total k-mers in transition table: 255
+Total k-mers in transition table: 100
 
 ## Sample k-mers (first 10)
 AAAA: 4 event types

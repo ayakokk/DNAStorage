@@ -15,7 +15,7 @@ include("channel.jl")
 #parameters
 k=parse(Int8,ARGS[4]) #INT [1:10]
 nbrSim=parse(Int64,ARGS[1])#INT>0
-seq=(readdlm(ARGS[2])) #String: one sequence (with or wothout a header part starting with '>')
+seq=readlines(ARGS[2]) #String: one sequence (with or without a header part starting with '>')
 
 
 include("loadProb.jl") #load the error profile related to k

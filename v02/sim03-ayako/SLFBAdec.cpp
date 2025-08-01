@@ -710,10 +710,7 @@ void SLFBAdec::SetGENewMinimal(){
   // 段階的ロードアプローチ: 起動時は基本テーブルのみ初期化
   printf("# SetGENewMinimal: Initializing basic GENew table structure\n");
   
-  // まず事前計算済みデータの読み込みを試行
-  bool precomputed_loaded = LoadAllPrecomputedGENew("precomputed_genew");
-  
-  // テーブル構造のみ初期化、中身は後で必要に応じて計算
+  // まずテーブル構造を初期化
   GENew = new double *** [Nu*2+1];
   
   for(int ly=0;ly<=Nu*2;ly++){
@@ -750,13 +747,16 @@ void SLFBAdec::SetGENewMinimal(){
     }
   }
   
+  printf("# SetGENewMinimal: Structure initialized for ly=0 to %d\n", Nu*2);
+  
+  // 構造初期化後に事前計算済みデータの読み込みを試行
+  bool precomputed_loaded = LoadAllPrecomputedGENew("precomputed_genew");
+  
   if(precomputed_loaded) {
     printf("# SetGENewMinimal: Using precomputed data\n");
   } else {
     printf("# SetGENewMinimal: Precomputed data not found, will compute on-demand\n");
   }
-  
-  printf("# SetGENewMinimal: Structure initialized for ly=0 to %d\n", Nu*2);
 }
 
 void SLFBAdec::ExpandGENew(int ly){

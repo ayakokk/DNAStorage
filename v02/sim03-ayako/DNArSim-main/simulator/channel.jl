@@ -20,6 +20,13 @@ function channel(nbrSim=0,k=0,seq="")
 			println("Error: reference file format incorrect!")
 			exit(1)
 		end
+	elseif(length(seq)==1)
+		# Single line file - extract the sequence string
+		seq=seq[1]
+	else
+		println()
+		println("Error: empty input file!")
+		exit(1)
 	end
 
 	if(!occursin(r"^[ACGT]+$", seq))
