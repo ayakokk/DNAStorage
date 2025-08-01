@@ -9,7 +9,7 @@ private:
   int min(int a, int b);
   unsigned char inv(unsigned char a);
 public:
-  IDSchannel(int _N, double _Pi, double _Pd, double _Ps);
+  IDSchannel(int _N);  // DNA channel constructor - no IDS parameters needed
   ~IDSchannel();
   int transmit(unsigned char *Y, const unsigned char *X);  // returns length of Y
   int    GetN();

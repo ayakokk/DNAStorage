@@ -24,18 +24,20 @@ unsigned char IDSchannel::inv(unsigned char a){
 //================================================================================
 
 //================================================================================
-IDSchannel::IDSchannel(int _N, double _Pi, double _Pd, double _Ps){
+IDSchannel::IDSchannel(int _N){
   N  = _N;
-  Pi = _Pi;
-  Pd = _Pd;
-  Ps = _Ps;
-  Dmin = (int)floor(-(double)Drange*N*Pd);
-  Dmax = (int)ceil ( (double)Drange*N*Pi);
-  printf("# IDSchannel: N=%d (Pi,Pd,Ps)=(%e,%e,%e) (Dmin,Dmax)=(%d,%d)\n",N,Pi,Pd,Ps,Dmin,Dmax);
+  // DNA channel parameters - based on realistic nanopore sequencing characteristics
+  Pi = 0.05;  // Effective insertion rate for Nu2min/Nu2max calculation
+  Pd = 0.05;  // Effective deletion rate for Nu2min/Nu2max calculation  
+  Ps = 0.05;  // Effective substitution rate (not used in drift calculation)
+  
+  // DNA channel drift range - more conservative than IDS theoretical bounds
+  double dna_drift_factor = 1.0;  // Reduced from 2.0 for DNA reality
+  Dmin = (int)floor(-(double)dna_drift_factor*N*Pd);
+  Dmax = (int)ceil ( (double)dna_drift_factor*N*Pi);
+  
+  printf("# IDSchannel: N=%d DNA_Channel (Dmin,Dmax)=(%d,%d)\n",N,Dmin,Dmax);
   assert( N>0 );
-  assert( Pi>=0.0 && Pi<0.5 );
-  assert( Pd>=0.0 && Pd<0.5 );
-  assert( Ps>=0.0 && Ps<0.5 );
   DR = new int [N+1];
 }
 

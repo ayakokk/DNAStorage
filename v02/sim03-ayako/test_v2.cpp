@@ -29,7 +29,7 @@ int main() {
         
         // IDSchannel初期化
         std::cout << "IDSchannel初期化中..." << std::endl;
-        IDSchannel *CH = new IDSchannel(12, 0.05, 0.05, 0.05);  // N=12, Pi=Pd=Ps=0.05
+        IDSchannel *CH = new IDSchannel(12);  // N=12, DNA channel mode
         std::cout << "IDSchannel初期化完了: Pi=" << CH->GetPi() << ", Pd=" << CH->GetPd() << ", Ps=" << CH->GetPs() << std::endl;
 
         // --- 2. SLFBAdec初期化 ---

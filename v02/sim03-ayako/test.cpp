@@ -36,10 +36,10 @@ int main(){
     ChannelMatrix *ECM = new ChannelMatrix(ICB->Get_numCW(), ICB->Get_numCW());
     printf("ChannelMatrix初期化完了\n");
 
-    // IDSchannel初期化
+    // IDSchannel初期化 (DNA channelモード)
     printf("IDSchannel初期化中...\n");
-    IDSchannel *CH = new IDSchannel(N, Pi, Pd, Ps);
-    printf("IDSchannel初期化完了: Pi=%f, Pd=%f, Ps=%f\n", Pi, Pd, Ps);
+    IDSchannel *CH = new IDSchannel(N);
+    printf("IDSchannel初期化完了 (DNA channel mode)\n");
 
     printf("\n--- 2. SLFBAdec初期化（SetGXNew, SetGENew含む） ---\n");
     SLFBAdec *decoder = new SLFBAdec(ICB, ECM, CH);

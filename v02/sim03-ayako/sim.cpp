@@ -191,7 +191,7 @@ int main(int argc, char *argv[]){
   int Nb,Nb2;      // block length & recv length (bits)
   int Q, Nu;       // numCW, symbol-len [ICB]
   int seed;
-  double Pi,Pd,Ps; // IDS prob
+  // DNA channel mode - no IDS parameters needed
   char *fn;
   char *fncb    = new char [BSIZE];
   char *fnconst = new char [BSIZE];
@@ -203,10 +203,6 @@ int main(int argc, char *argv[]){
   fn   =      argv[1];
   N    = atoi(argv[2]);
   seed = atoi(argv[3]);
-  // DNA channel parameters (fixed for Julia simulator)
-  Pi   = 0.004; // Dummy IDS values - actual probabilities from GENew/GXNew tables
-  Pd   = 0.004;
-  Ps   = 0.004;
   if(seed==-1) seed = (int)time(NULL);
   srandom(seed);
   assert(N>0);
@@ -224,8 +220,8 @@ int main(int argc, char *argv[]){
   printf("# Const: %s\n",fnconst);
   printf("# EncCM: %s\n",fncm);
   class ChannelMatrix *ECM = new class ChannelMatrix(fncm);
-  // IDSchannel with dummy parameters - actual probabilities from Julia DNA simulator
-  class IDSchannel    *CH  = new class IDSchannel(Nb,Pi,Pd,Ps);
+  // IDSchannel for DNA channel - no IDS parameters needed
+  class IDSchannel    *CH  = new class IDSchannel(Nb);
   class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
   class ChannelMatrix *DCM = new class ChannelMatrix(Q,(int)pow(Q,OutListSize));
   int        *dbgDR = new int [Nb+1];                         // (dbg)drift vector
