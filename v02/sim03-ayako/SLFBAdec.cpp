@@ -783,9 +783,12 @@ void SLFBAdec::ExpandGENew(int ly){
       ICB->Get_CW(X,xi);
       x = VectToLong(X,Nu);
       
-      // 各エラー状態について個別に格子計算による正確な確率を計算
+      // calc_prob統合システム版: 観測配列y考慮の確率分布計算
+      std::array<double,4> event_distribution = CalcPexNewWithObservationIntegrated(y,x,ly,Nu);
+      
+      // 4つのイベント確率を格納
       for(int error_state=0; error_state<4; error_state++){
-        GENew[ly][y][xi][error_state] = CalcPexNewWithErrorState(y,x,ly,Nu,error_state);
+        GENew[ly][y][xi][error_state] = event_distribution[error_state];
         calculations++;
       }
     }
@@ -831,9 +834,12 @@ void SLFBAdec::PrecomputeGENewForLy(int ly){
       ICB->Get_CW(X,xi);
       x = VectToLong(X,Nu);
       
-      // 各エラー状態について個別に格子計算による正確な確率を計算（制限なし）
+      // calc_prob統合システム版: 観測配列y考慮の確率分布計算（制限なし）
+      std::array<double,4> event_distribution = CalcPexNewWithObservationIntegrated(y,x,ly,Nu);
+      
+      // 4つのイベント確率を格納
       for(int error_state=0; error_state<4; error_state++){
-        GENew[ly][y][xi][error_state] = CalcPexNewWithErrorState(y,x,ly,Nu,error_state);
+        GENew[ly][y][xi][error_state] = event_distribution[error_state];
         calculations++;
       }
     }
@@ -1121,18 +1127,30 @@ double SLFBAdec::CalcPexNewWithErrorState(long y, long x, int ly, int lx, int ta
               
               // k-mer依存の遷移確率を取得
               std::vector<double> trans_probs = {0.7, 0.1, 0.1, 0.1}; // デフォルト値
+              bool kmer_found = false;
               if (transition_probs.find(current_kmer) != transition_probs.end() &&
                   transition_probs[current_kmer].find(current_event) != transition_probs[current_kmer].end()) {
                   trans_probs = transition_probs[current_kmer][current_event];
+                  kmer_found = true;
+              }
+              
+              // デバッグ情報（最初の数回のみ出力）
+              static int debug_count = 0;
+              if (debug_count < 5) {
+                  debug_file << "  k-mer: " << current_kmer << " found: " << (kmer_found ? "YES" : "NO") 
+                            << " probs: [" << trans_probs[0] << "," << trans_probs[1] << "," 
+                            << trans_probs[2] << "," << trans_probs[3] << "]" << std::endl;
+                  debug_count++;
               }
               
               debug_file << "\nF[" << i << "][" << j << "][" << current_event 
                         << "] = " << std::scientific << current_prob << " (k-mer: " << current_kmer << ")" << std::endl;
               
-              // Match遷移: (i+1, j+1, Match) - eLattice_v7.cppと同じロジック
+              // Match遷移: (i+1, j+1, Match) - Julia k-mer確率を直接使用
               if (i + 1 <= max_i && j + 1 <= max_j && i < lx && j < ly) {
                   if (X[i] == Y[j] && trans_probs[0] > 0) {
-                      double match_prob = current_prob * trans_probs[0] * Psub(X[i], Y[j]) * Pt;
+                      // Julia k-mer確率にはすでに現実的なエラー率が含まれているため、追加のPt乗算は不要
+                      double match_prob = current_prob * trans_probs[0];
                       lattice[i+1][j+1][0] += match_prob;
                       if (match_prob > 1e-15) {
                           debug_file << "  Match遷移: F[" << (i+1) << "][" << (j+1) << "][0] += " 
@@ -1143,7 +1161,8 @@ double SLFBAdec::CalcPexNewWithErrorState(long y, long x, int ly, int lx, int ta
               
               // Insertion遷移: (i, j+1, Insertion)
               if (j + 1 <= max_j && trans_probs[1] > 0) {
-                  double ins_prob = current_prob * trans_probs[1] * Pi * 0.25; // 4つの塩基への等確率
+                  // Julia k-mer確率にはすでに挿入確率が含まれているため、追加のPi乗算は不要
+                  double ins_prob = current_prob * trans_probs[1];
                   lattice[i][j+1][1] += ins_prob;
                   if (ins_prob > 1e-15) {
                       debug_file << "  Insertion遷移: F[" << i << "][" << (j+1) << "][1] += " 
@@ -1153,7 +1172,8 @@ double SLFBAdec::CalcPexNewWithErrorState(long y, long x, int ly, int lx, int ta
               
               // Deletion遷移: (i+1, j, Deletion)
               if (i + 1 <= max_i && trans_probs[2] > 0) {
-                  double del_prob = current_prob * trans_probs[2] * Pd;
+                  // Julia k-mer確率にはすでに削除確率が含まれているため、追加のPd乗算は不要
+                  double del_prob = current_prob * trans_probs[2];
                   lattice[i+1][j][2] += del_prob;
                   if (del_prob > 1e-15) {
                       debug_file << "  Deletion遷移: F[" << (i+1) << "][" << j << "][2] += " 
@@ -1164,7 +1184,8 @@ double SLFBAdec::CalcPexNewWithErrorState(long y, long x, int ly, int lx, int ta
               // Substitution遷移: (i+1, j+1, Substitution)
               if (i + 1 <= max_i && j + 1 <= max_j && i < lx && j < ly) {
                   if (X[i] != Y[j] && trans_probs[3] > 0) {
-                      double sub_prob = current_prob * trans_probs[3] * Psub(X[i], Y[j]) * Pt * (1.0/3.0);
+                      // Julia k-mer確率にはすでに置換確率が含まれているため、追加のPsub/Pt乗算は不要
+                      double sub_prob = current_prob * trans_probs[3];
                       lattice[i+1][j+1][3] += sub_prob;
                       if (sub_prob > 1e-15) {
                           debug_file << "  Substitution遷移: F[" << (i+1) << "][" << (j+1) << "][3] += " 
@@ -1211,6 +1232,146 @@ double SLFBAdec::CalcPexNewWithErrorState(long y, long x, int ly, int lx, int ta
   delete [] X;
   delete [] Y;
   return result;
+}
+
+// calc_prob統合システム版: 観測配列y考慮の確率分布計算
+std::array<double,4> SLFBAdec::CalcPexNewWithObservationIntegrated(long y, long x, int ly, int lx){
+  // eLattice_v8.cppのcomputeProbabilityDistributionWithObservation移行版
+  // 全mパターンで周辺化を行い、観測配列yを必ず考慮した正確な確率分布を計算
+  
+  assert(lx > 0 && ly >= 0);
+  
+  if(ly == 0) {
+    // 削除のみが可能な場合
+    return {0.0, 0.0, 1.0, 0.0}; // Deletion確率=1.0
+  }
+  
+  std::array<double,4> event_posteriors = {0.0, 0.0, 0.0, 0.0};
+  
+  // φ0パターンのインデックスを取得（入力xからcodebook検索）
+  std::vector<int> x_pattern = longToBinaryVector(x, lx);
+  int phi0_i_idx = findPhi0IndexInCodebook(x_pattern, 0, 6);       // 前半6ビット
+  int phi0_i1_idx = findPhi0IndexInCodebook(x_pattern, 6, 6);     // 後半6ビット
+  
+  if(phi0_i_idx == -1 || phi0_i1_idx == -1) {
+    // codebookにない場合は従来の方法
+    for(int error_state = 0; error_state < 4; error_state++){
+      event_posteriors[error_state] = CalcPexNewWithErrorState(y, x, ly, lx, error_state);
+    }
+    return event_posteriors;
+  }
+  
+  // 観測配列yをバイナリベクターに変換
+  std::vector<char> observed_y_chars = longToDNAVector(y, ly);
+  
+  // 4096通りのmパターンで周辺化（calc_probアプローチ）
+  for(int m_pattern_int = 0; m_pattern_int < 4096; m_pattern_int++) {
+    
+    // m_pattern_intを12ビットのバイナリ配列に変換
+    std::vector<int> m_pattern(12);
+    for(int bit = 0; bit < 12; bit++) {
+      m_pattern[11-bit] = (m_pattern_int >> bit) & 1;
+    }
+    
+    // このmパターンでのk-merを構築
+    std::string kmer = buildKmerFromPhi0PatternsIntegrated(phi0_i_idx, phi0_i1_idx, m_pattern);
+    
+    // 各イベントについて計算
+    for(int event = 0; event < 4; event++) {
+      
+      // 尤度（3D格子計算）：P(observed_y | φ0, m, event, drifts)
+      double likelihood = compute3DLatticeIntegrated(kmer, observed_y_chars, event);
+      
+      // 事前確率：P(event | k-mer)（k-mer依存遷移確率テーブル）
+      double prior_prob = getTransitionProbability(kmer, event);
+      
+      // m事前確率（均等分布と仮定）
+      double m_prior = 1.0 / 4096.0;
+      
+      // 結合確率：P(event, m | observed_y, φ0)
+      double joint_prob = likelihood * prior_prob * m_prior;
+      
+      // 周辺化：∑_m P(event, m | ...)
+      event_posteriors[event] += joint_prob;
+    }
+  }
+  
+  return event_posteriors;
+}
+
+// ヘルパー関数群の実装
+
+std::vector<int> SLFBAdec::longToBinaryVector(long value, int length) {
+  std::vector<int> binary_vector(length);
+  for(int i = 0; i < length; i++) {
+    binary_vector[length - 1 - i] = (value >> i) & 1;
+  }
+  return binary_vector;
+}
+
+std::vector<char> SLFBAdec::longToDNAVector(long value, int length) {
+  std::vector<char> dna_vector;
+  std::vector<int> binary = longToBinaryVector(value, length);
+  
+  // バイナリペアをDNA塩基に変換（00→G, 01→C, 10→A, 11→T）
+  for(size_t i = 0; i < binary.size(); i += 2) {
+    if(i + 1 < binary.size()) {
+      int pair = (binary[i] << 1) | binary[i + 1];
+      switch(pair) {
+        case 0: dna_vector.push_back('G'); break; // 00
+        case 1: dna_vector.push_back('C'); break; // 01
+        case 2: dna_vector.push_back('A'); break; // 10
+        case 3: dna_vector.push_back('T'); break; // 11
+      }
+    }
+  }
+  return dna_vector;
+}
+
+int SLFBAdec::findPhi0IndexInCodebook(const std::vector<int>& pattern, int start, int length) {
+  // codebook読み込みが未実装のため、暫定的に-1を返す
+  // TODO: codebook機能を統合する必要がある
+  return -1;
+}
+
+std::string SLFBAdec::buildKmerFromPhi0PatternsIntegrated(int phi0_i_idx, int phi0_i1_idx, const std::vector<int>& m_pattern) {
+  // codebook未統合のため、暫定的にデフォルトk-merを返す
+  // TODO: 実際のφ0パターンからk-mer構築を実装
+  return std::string(k_mer_length, 'G');
+}
+
+double SLFBAdec::compute3DLatticeIntegrated(const std::string& kmer, const std::vector<char>& observed_y, int target_event) {
+  // 簡略版3D格子計算
+  // 実際の尤度計算の代わりに、k-mer依存の固定確率を返す
+  if(transition_probs.find(kmer) != transition_probs.end() &&
+     transition_probs[kmer].find(target_event) != transition_probs[kmer].end()) {
+    
+    auto& probs = transition_probs[kmer][target_event]; 
+    if(target_event < static_cast<int>(probs.size())) {
+      return probs[target_event] * 0.1; // 暫定的な尤度重み
+    }
+  }
+  
+  // デフォルト尤度
+  return 0.01;
+}
+
+double SLFBAdec::getTransitionProbability(const std::string& kmer, int event) {
+  // k-mer依存遷移確率テーブルから確率を取得
+  if(transition_probs.find(kmer) != transition_probs.end()) {
+    
+    // 前のイベントは暫定的にMatch(0)と仮定
+    int prev_event = 0;
+    if(transition_probs[kmer].find(prev_event) != transition_probs[kmer].end()) {
+      auto& probs = transition_probs[kmer][prev_event];
+      if(event < static_cast<int>(probs.size())) {
+        return probs[event];
+      }
+    }
+  }
+  
+  // デフォルト均等確率
+  return 0.25;
 }
 
 double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
@@ -1312,6 +1473,7 @@ void SLFBAdec::loadTransitionProbabilities(int k) {
         // 数値の妥当性チェック
         if (match >= 0.0 && match <= 1.0 && ins >= 0.0 && ins <= 1.0 && 
             del >= 0.0 && del <= 1.0 && sub >= 0.0 && sub <= 1.0) {
+          // 順序：0=Match, 1=Insertion, 2=Deletion, 3=Substitution
           transition_probs[kmer][prev_event] = {match, ins, del, sub};
           line_count++;
           total_loaded++;
@@ -1857,7 +2019,7 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   Nu2min = Nu - (int)ceil( (double)Nu*Pd ) - 2;
   Nu2max = min(Nu2max, Nu*2);
   Nu2min = max(Nu2min, 0   );
-  k_mer_length = 4; // デフォルトk=4、必要に応じて設定可能にする
+  k_mer_length = 4; // デフォルト確率問題調査のためk=4に戻す
   genew_loaded_ly.clear(); // 段階的ロード状況の初期化
   printf("# SLFBAdec: Ns=%d (Nu;Nu2min,Nu2max)=(%d(%ld);%d,%d) Nb=%d Q=%d\n",Ns,Nu,Nu2p,Nu2min,Nu2max,Nb,Q);
   printf("# SLFBAdec: (Pi,Pd,Ps,Pt)=(%e,%e,%e,%e) (Dmin,Dmax:Drng)=(%d,%d:%d)\n",

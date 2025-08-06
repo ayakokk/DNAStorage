@@ -66,6 +66,15 @@ private:
   void DelGENew();
   double CalcPexNew(long y, long x, int ly, int lx);  // P(e_(i+1)v|...) 後方互換性用
   double CalcPexNewWithErrorState(long y, long x, int ly, int lx, int target_error_state);  // エラー状態別確率計算
+  std::array<double,4> CalcPexNewWithObservationIntegrated(long y, long x, int ly, int lx);  // calc_prob統合版
+  
+  // calc_prob統合システム用のヘルパー関数
+  std::vector<int> longToBinaryVector(long value, int length);
+  std::vector<char> longToDNAVector(long value, int length);
+  int findPhi0IndexInCodebook(const std::vector<int>& pattern, int start, int length);
+  std::string buildKmerFromPhi0PatternsIntegrated(int phi0_i_idx, int phi0_i1_idx, const std::vector<int>& m_pattern);
+  double compute3DLatticeIntegrated(const std::string& kmer, const std::vector<char>& observed_y, int target_event);
+  double getTransitionProbability(const std::string& kmer, int event);
   void outputLatticeDebug(const std::vector<std::vector<std::vector<double>>>& lattice,
                          int target_i, int target_j, const std::string& description,
                          std::ofstream& debug_file);

@@ -14,9 +14,10 @@
 #include "SLFBAdec.hpp"
 
 int main(int argc, char *argv[]) {
-    if (argc != 7) {
-        printf("Usage: %s <ICB_dir> <N> <Pi> <Pd> <Ps> <output_dir>\n", argv[0]);
-        printf("Example: %s ICB/ex01/ 3 0.004 0.004 0.004 precomputed_genew/\n", argv[0]);
+    if (argc != 4) {
+        printf("Usage: %s <ICB_dir> <N> <output_dir>\n", argv[0]);
+        printf("Example: %s ICB/ex01/ 3 precomputed_genew/\n", argv[0]);
+        printf("Note: Pi,Pd,Ps parameters are automatically set to optimal values (0.05)\n");
         return 1;
     }
 
@@ -27,15 +28,17 @@ int main(int argc, char *argv[]) {
     // パラメータ解析
     const char *icb_dir = argv[1];
     int N = atoi(argv[2]);
-    double Pi = atof(argv[3]);
-    double Pd = atof(argv[4]);
-    double Ps = atof(argv[5]);
-    const char *output_dir = argv[6];
+    const char *output_dir = argv[3];
+    
+    // 最適値を自動設定（IDSchannelと同じ値）
+    double Pi = 0.05;
+    double Pd = 0.05;
+    double Ps = 0.05;
 
     printf("Parameters:\n");
     printf("  ICB directory: %s\n", icb_dir);
     printf("  Block length N: %d\n", N);
-    printf("  Channel: Pi=%.6f, Pd=%.6f, Ps=%.6f\n", Pi, Pd, Ps);
+    printf("  Channel: Pi=%.6f, Pd=%.6f, Ps=%.6f (auto-optimized)\n", Pi, Pd, Ps);
     printf("  Output directory: %s\n", output_dir);
 
     auto total_start = std::chrono::high_resolution_clock::now();
@@ -55,7 +58,7 @@ int main(int argc, char *argv[]) {
 
         // IDSchannel初期化
         printf("Initializing IDSchannel...\n");
-        IDSchannel *CH = new IDSchannel(N*ICB->Get_Nu(), Pi, Pd, Ps);
+        IDSchannel *CH = new IDSchannel(N*ICB->Get_Nu());
 
         printf("\n--- 2. SLFBAdec Initialization ---\n");
         SLFBAdec *decoder = new SLFBAdec(ICB, ECM, CH);

@@ -7,7 +7,7 @@ using DelimitedFiles
 include("functions.jl")
 include("channel.jl")
 
-# Load probability data for k=4 (fixed for this server)
+# Load probability data for k=4 (investigating default probability issue)
 k = 4
 # Change to correct directory before loading
 cd(dirname(@__FILE__))

@@ -1,10 +1,10 @@
 # GENew Precomputed Data Metadata
-# Generated on: Aug  1 2025 13:01:56
+# Generated on: Aug  4 2025 15:23:06
 Nu=6
 Q=18
-Pi=4.000000e-03
-Pd=4.000000e-03
-Ps=4.000000e-03
+Pi=5.000000e-02
+Pd=5.000000e-02
+Ps=5.000000e-02
 Nu2min=3
 Nu2max=9
 k_mer_length=4
