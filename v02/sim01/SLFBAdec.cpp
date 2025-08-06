@@ -4,6 +4,7 @@
 #include <math.h>
 #include <time.h>
 #include <assert.h>
+#include <string>
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -560,5 +561,129 @@ void SLFBAdec::PrintNode(int idx, int iw){
 //================================================================================
 void SLFBAdec::PrintNode(const int *dbgIW){
   for(int i=0;i<Ns;i++) PrintNode(i,dbgIW[i]);
+}
+
+//================================================================================
+// テーブル出力機能の実装
+//================================================================================
+void SLFBAdec::exportGDTable(const char* filename) {
+  printf("# Exporting GD table to %s\n", filename);
+  
+  FILE* file = fopen(filename, "w");
+  if (!file) {
+    printf("# Error: Cannot open file %s\n", filename);
+    return;
+  }
+  
+  // ヘッダー情報
+  fprintf(file, "# GD (Drift Probability) Table\n");
+  fprintf(file, "# Parameters: Pi=%.6f Pd=%.6f Ps=%.6f Pt=%.6f\n", Pi, Pd, Ps, Pt);
+  fprintf(file, "# Drng=%d Nu=%d\n", Drng, Nu);
+  fprintf(file, "# Format: d0 d1 probability\n");
+  fprintf(file, "d0\td1\tprobability\n");
+  
+  // GDテーブル出力
+  for (int d0 = 0; d0 < Drng; d0++) {
+    for (int d1 = 0; d1 < Drng; d1++) {
+      fprintf(file, "%d\t%d\t%.12e\n", d0 - Dmin, d1 - Dmin, GD[d0][d1]);
+    }
+  }
+  
+  fclose(file);
+  printf("# GD table exported successfully\n");
+}
+
+//================================================================================
+void SLFBAdec::exportGXTable(const char* filename) {
+  printf("# Exporting GX table to %s\n", filename);
+  
+  FILE* file = fopen(filename, "w");
+  if (!file) {
+    printf("# Error: Cannot open file %s\n", filename);
+    return;
+  }
+  
+  // ヘッダー情報
+  fprintf(file, "# GX (Channel Output Probability) Table\n");
+  fprintf(file, "# Parameters: Pi=%.6f Pd=%.6f Ps=%.6f Pt=%.6f\n", Pi, Pd, Ps, Pt);
+  fprintf(file, "# Nu=%d Q=%d Nu2min=%d Nu2max=%d\n", Nu, Q, Nu2min, Nu2max);
+  fprintf(file, "# Format: ly binary(y) xi probability\n");
+  fprintf(file, "ly\tbinary(y)\txi\tprobability\n");
+  
+  unsigned char *Y = new unsigned char[Nu*2];
+  
+  // GXテーブル出力
+  for (int ly = 0; ly <= Nu*2; ly++) {
+    if (ly < Nu2min || ly > Nu2max) {
+      // 近似値の場合
+      fprintf(file, "%d\t(approx)\t-1\t%.12e\n", ly, GX[ly][0][0]);
+    } else {
+      // 正確値の場合
+      long ly2p = (long)pow(2, ly);
+      for (long y = 0; y < ly2p; y++) {
+        // yをバイナリ文字列に変換
+        LongToVect(Y, y, ly);
+        std::string y_binary = "";
+        for (int i = 0; i < ly; i++) {
+          y_binary += (char)('0' + Y[i]);
+        }
+        
+        for (int xi = 0; xi < Q; xi++) {
+          fprintf(file, "%d\t%s\t%d\t%.12e\n", ly, y_binary.c_str(), xi, GX[ly][y][xi]);
+        }
+      }
+    }
+  }
+  
+  delete[] Y;
+  fclose(file);
+  printf("# GX table exported successfully\n");
+}
+
+//================================================================================
+void SLFBAdec::exportAllTables(const char* output_dir) {
+  printf("# Exporting all probability tables to directory: %s\n", output_dir);
+  
+  // ディレクトリ作成
+  char mkdir_cmd[1024];
+  snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", output_dir);
+  system(mkdir_cmd);
+  
+  // ファイル名生成
+  char gd_file[1024], gx_file[1024], summary_file[1024];
+  snprintf(gd_file, sizeof(gd_file), "%s/GD_table.txt", output_dir);
+  snprintf(gx_file, sizeof(gx_file), "%s/GX_table.txt", output_dir);
+  snprintf(summary_file, sizeof(summary_file), "%s/sim01_tables_summary.txt", output_dir);
+  
+  // テーブル出力
+  exportGDTable(gd_file);
+  exportGXTable(gx_file);
+  
+  // サマリーファイル作成
+  FILE* summary = fopen(summary_file, "w");
+  if (summary) {
+    fprintf(summary, "# SLFBAdec sim01 Probability Tables Summary\n");
+    time_t rawtime;
+    struct tm * timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    fprintf(summary, "# Generated on: %s", asctime(timeinfo));
+    fprintf(summary, "\n## Parameters\n");
+    fprintf(summary, "Nu (symbol length): %d\n", Nu);
+    fprintf(summary, "Q (codewords): %d\n", Q);
+    fprintf(summary, "Channel parameters: Pi=%.6f Pd=%.6f Ps=%.6f Pt=%.6f\n", Pi, Pd, Ps, Pt);
+    fprintf(summary, "Drift range: %d to %d (Drng=%d)\n", Dmin, Dmax, Drng);
+    fprintf(summary, "Nu2 range: %d to %d\n", Nu2min, Nu2max);
+    fprintf(summary, "\n## Generated Files\n");
+    fprintf(summary, "1. GD_table.txt - Drift probability table P(d1|d0)\n");
+    fprintf(summary, "2. GX_table.txt - Channel output probability table P(y|x)\n");
+    fprintf(summary, "\n## Table Characteristics\n");
+    fprintf(summary, "- GD table: %dx%d matrix\n", Drng, Drng);
+    fprintf(summary, "- GX table: Variable size based on ly and xi\n");
+    fprintf(summary, "- Theoretical IDS channel model\n");
+    fclose(summary);
+  }
+  
+  printf("# All probability tables exported to: %s\n", output_dir);
 }
 

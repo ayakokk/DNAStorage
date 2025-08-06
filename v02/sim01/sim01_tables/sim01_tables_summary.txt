@@ -1,0 +1,18 @@
+# SLFBAdec sim01 Probability Tables Summary
+# Generated on: Wed Aug  6 15:47:15 2025
+
+## Parameters
+Nu (symbol length): 6
+Q (codewords): 18
+Channel parameters: Pi=0.004000 Pd=0.004000 Ps=0.004000 Pt=0.992000
+Drift range: -3 to 3 (Drng=7)
+Nu2 range: 3 to 9
+
+## Generated Files
+1. GD_table.txt - Drift probability table P(d1|d0)
+2. GX_table.txt - Channel output probability table P(y|x)
+
+## Table Characteristics
+- GD table: 7x7 matrix
+- GX table: Variable size based on ly and xi
+- Theoretical IDS channel model

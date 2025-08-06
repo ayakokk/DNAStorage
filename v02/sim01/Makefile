@@ -1,4 +1,4 @@
-all: func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o CBsearch GenEncCM sim
+all: func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o CBsearch GenEncCM sim test_tables
 
 func.o: func.cpp func.hpp Makefile
 	g++ -Wall -O3 -c -o func.o func.cpp
@@ -24,6 +24,9 @@ GenEncCM: GenEncCM.cpp func.o ChannelMatrix.o InnerCodebook.o Makefile
 sim: sim.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
 	g++ -Wall -O3 -o sim func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o sim.cpp
 
+test_tables: test_tables.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
+	g++ -Wall -O3 -o test_tables func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o test_tables.cpp
+
 clean:
-	rm -f CBsearch GenEncCM sim *.o
+	rm -f CBsearch GenEncCM sim test_tables *.o
 

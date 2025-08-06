@@ -54,4 +54,8 @@ public:
   void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW);  // (uniform prior)
   void PrintNode(int idx, int iw);
   void PrintNode(const int *dbgIW);
+  // テーブル出力機能
+  void exportGDTable(const char* filename);
+  void exportGXTable(const char* filename);
+  void exportAllTables(const char* output_dir);
 };
