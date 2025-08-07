@@ -1657,7 +1657,12 @@ std::array<double,4> SLFBAdec::computeEventProbabilityDistributionWithPreviousSt
   // calc_prob/eLattice_v8.cpp のcomputeProbabilityDistributionWithObservation と同様の実装
   // 前のエラー状態e_ivを考慮した正確な確率分布を計算
   
-  assert(Nu2 > 0 && y >= 0);
+  // デバッグ情報付きアサーション（Nu2=0は削除専用として許可）
+  if(Nu2 < 0 || y < 0) {
+    printf("[ERROR] computeEventProbabilityDistributionWithPreviousState: Invalid parameters - Nu2=%d, y=%ld, xi=%ld, prev_e=%d\n", 
+           Nu2, y, (long)xi, previous_error_state);
+    assert(false);
+  }
   assert(xi>=0 && xi<Q);
   assert(previous_error_state>=0 && previous_error_state<4);
   
