@@ -1329,15 +1329,69 @@ std::vector<char> SLFBAdec::longToDNAVector(long value, int length) {
 }
 
 int SLFBAdec::findPhi0IndexInCodebook(const std::vector<int>& pattern, int start, int length) {
-  // codebook読み込みが未実装のため、暫定的に-1を返す
-  // TODO: codebook機能を統合する必要がある
-  return -1;
+  // バイナリパターンを内部符号帳（Inner Codebook）で検索し、φ0パターンのインデックスを取得
+  if(start + length > (int)pattern.size() || length != Nu) {
+    return -1; // 範囲外または長さ不正
+  }
+  
+  // 検索対象のパターンを抽出
+  unsigned char *target = new unsigned char[Nu];
+  for(int i = 0; i < length; i++) {
+    target[i] = (unsigned char)pattern[start + i];
+  }
+  long target_val = VectToLong(target, length);
+  
+  // 全コードワードと比較してマッチするインデックスを探す
+  unsigned char *cw = new unsigned char[Nu];
+  for(int idx = 0; idx < Q; idx++) {
+    ICB->Get_CW(cw, idx);
+    long cw_val = VectToLong(cw, Nu);
+    if(cw_val == target_val) {
+      delete[] target;
+      delete[] cw;
+      return idx; // マッチした場合はインデックスを返す
+    }
+  }
+  
+  delete[] target;
+  delete[] cw;
+  return -1; // 見つからない場合
 }
 
 std::string SLFBAdec::buildKmerFromPhi0PatternsIntegrated(int phi0_i_idx, int phi0_i1_idx, const std::vector<int>& m_pattern) {
-  // codebook未統合のため、暫定的にデフォルトk-merを返す
-  // TODO: 実際のφ0パターンからk-mer構築を実装
-  return std::string(k_mer_length, 'G');
+  // φ0パターンインデックスから実際のk-merを構築
+  if(phi0_i_idx < 0 || phi0_i_idx >= Q || phi0_i1_idx < 0 || phi0_i1_idx >= Q) {
+    // インデックスが無効な場合はデフォルトk-merを返す
+    return std::string(k_mer_length, 'G');
+  }
+  
+  // φ0(u'_i)とφ0(u'_(i+1))のコードワードを取得
+  unsigned char *cw_i = new unsigned char[Nu];
+  unsigned char *cw_i1 = new unsigned char[Nu];
+  ICB->Get_CW(cw_i, phi0_i_idx);
+  ICB->Get_CW(cw_i1, phi0_i1_idx);
+  
+  // コードワードをDNA配列に変換
+  std::string dna_i = binaryToDNA(cw_i, Nu);
+  std::string dna_i1 = binaryToDNA(cw_i1, Nu);
+  
+  // k-mer長に合わせてDNA配列を結合・調整
+  std::string combined_dna = dna_i + dna_i1;
+  
+  // メモリ解放
+  delete[] cw_i;
+  delete[] cw_i1;
+  
+  // k-mer長に切り詰めるか、不足分を'G'で補完
+  if((int)combined_dna.length() >= k_mer_length) {
+    return combined_dna.substr(0, k_mer_length);
+  } else {
+    // 不足分をGで補完
+    while((int)combined_dna.length() < k_mer_length) {
+      combined_dna += 'G';
+    }
+    return combined_dna;
+  }
 }
 
 double SLFBAdec::compute3DLatticeIntegrated(const std::string& kmer, const std::vector<char>& observed_y, int target_event) {
@@ -1374,6 +1428,19 @@ double SLFBAdec::getTransitionProbability(const std::string& kmer, int event) {
   return 0.25;
 }
 
+// getTransitionProbabilityWithPreviousState: e_ivを考慮したk-mer依存遷移確率
+double SLFBAdec::getTransitionProbabilityWithPreviousState(const std::string& kmer, int previous_error_state, int event) {
+  // 1. 遷移確率テーブルから前のエラー状態を考慮した確率を取得
+  if (transition_probs.find(kmer) != transition_probs.end() &&
+      transition_probs[kmer].find(previous_error_state) != transition_probs[kmer].end() &&
+      event < static_cast<int>(transition_probs[kmer][previous_error_state].size())) {
+    return transition_probs[kmer][previous_error_state][event];
+  }
+  
+  // 2. フォールバック: 前のエラー状態を考慮しない従来の確率
+  return getTransitionProbability(kmer, event);
+}
+
 double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
   // 後方互換性のため：全エラー状態の確率の合計を返す
   double total_prob = 0.0;
@@ -1384,10 +1451,11 @@ double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
 }
 
 //================================================================================
-double SLFBAdec::GetGENew(int Nu2, long y, long xi){
+double SLFBAdec::GetGENew(int Nu2, long y, long xi, int previous_error_state){
   assert(Nu2>=0 && Nu2<=2*Nu);
   assert(y >=0);
   assert(xi>=0 && xi<Q);
+  assert(previous_error_state>=0 && previous_error_state<4);
   
   // 段階的ロードアプローチ: 必要に応じてExpandGENewを呼び出し
   if(Nu2>=Nu2min && Nu2<=Nu2max) {
@@ -1396,27 +1464,167 @@ double SLFBAdec::GetGENew(int Nu2, long y, long xi){
       // 最初の値が-1.0（未計算）かチェック
       if(GENew[Nu2][0][0][0] < 0.0) {
         printf("# GetGENew: On-demand expansion for Nu2=%d\n", Nu2);
-        ExpandGENew(Nu2);
+        ExpandGENewWithPreviousState(Nu2, previous_error_state);
       }
     }
   }
   
-  // この関数はエラー状態の事後確率の合計を返す（正規化前）
-  double total_prob = 0.0;
+  // calc_prob/eLattice_v8.cpp と同様に前のエラー状態e_ivを考慮した確率分布を計算
+  // P(e_(i+1)v | e_iv, φ0, conditions) の正確な計算
+  std::array<double,4> probability_distribution = computeEventProbabilityDistributionWithPreviousState(
+    Nu2, y, xi, previous_error_state
+  );
   
-  if(Nu2<Nu2min || Nu2>Nu2max) {
-    // approximation: 全エラー状態の確率を合計
-    for(int e=0; e<4; e++) {
-      total_prob += GENew[Nu2][0][0][e];
-    }
-  } else {
-    // exact: 全エラー状態の確率を合計
-    for(int e=0; e<4; e++) {
-      total_prob += GENew[Nu2][y][xi][e];
+  // 最尤エラー状態を選択（GXNewと同じアプローチで一貫性を保持）
+  int best_error_state = 0;
+  double max_prob = probability_distribution[0];
+  for(int e = 1; e < 4; e++) {
+    if(probability_distribution[e] > max_prob) {
+      max_prob = probability_distribution[e];
+      best_error_state = e;
     }
   }
   
-  return total_prob;
+  return max_prob;
+}
+
+//================================================================================
+void SLFBAdec::ExpandGENewWithPreviousState(int ly, int previous_error_state){
+  // 前のエラー状態を考慮したGENew拡張計算
+  if(ly < Nu2min || ly > Nu2max) {
+    return;
+  }
+  
+  if(genew_loaded_ly.find(ly) != genew_loaded_ly.end()) {
+    return; // 既に計算済み
+  }
+  
+  printf("# ExpandGENewWithPreviousState: Computing ly=%d with e_iv=%d\n", ly, previous_error_state);
+  
+  long ly2p = (long)pow(2,ly);
+  unsigned char *X = new unsigned char [Nu];
+  
+  int calculations = 0;
+  
+  for(long y=0; y<ly2p; y++) {
+    for(int xi=0;xi<Q;xi++){
+      ICB->Get_CW(X,xi);
+      long x = VectToLong(X,Nu);
+      
+      // calc_prob統合システム版: 前のエラー状態を考慮した確率分布計算
+      std::array<double,4> event_distribution = computeEventProbabilityDistributionWithPreviousState(ly, y, xi, previous_error_state);
+      
+      // 4つのイベント確率を格納
+      for(int error_state=0; error_state<4; error_state++){
+        GENew[ly][y][xi][error_state] = event_distribution[error_state];
+        calculations++;
+      }
+    }
+    
+    // 進捗報告
+    if(ly >= 6 && y % 32 == 0) {
+      printf("# ExpandGENewWithPreviousState: ly=%d, progress: %ld/%ld (%.1f%%)\n", 
+             ly, y, ly2p, 100.0*y/ly2p);
+    }
+  }
+  
+  // 完了をマーク
+  genew_loaded_ly.insert(ly);
+  
+  printf("# ExpandGENewWithPreviousState: Completed ly=%d with %d calculations\n", ly, calculations);
+  delete [] X;
+}
+
+//================================================================================
+std::array<double,4> SLFBAdec::computeEventProbabilityDistributionWithPreviousState(int Nu2, long y, long xi, int previous_error_state){
+  // calc_prob/eLattice_v8.cpp のcomputeProbabilityDistributionWithObservation と同様の実装
+  // 前のエラー状態e_ivを考慮した正確な確率分布を計算
+  
+  assert(Nu2 > 0 && y >= 0);
+  assert(xi>=0 && xi<Q);
+  assert(previous_error_state>=0 && previous_error_state<4);
+  
+  if(Nu2 == 0) {
+    // 削除のみが可能な場合
+    return {0.0, 0.0, 1.0, 0.0}; // Deletion確率=1.0
+  }
+  
+  std::array<double,4> event_posteriors = {0.0, 0.0, 0.0, 0.0};
+  
+  // コードワードからφ0パターンを取得
+  unsigned char *X = new unsigned char [Nu];
+  ICB->Get_CW(X, xi);
+  long x = VectToLong(X, Nu);
+  
+  // φ0パターンのインデックスを取得（入力xからcodebook検索）
+  std::vector<int> x_pattern = longToBinaryVector(x, Nu);
+  int phi0_i_idx = findPhi0IndexInCodebook(x_pattern, 0, 6);       // 前半6ビット
+  int phi0_i1_idx = findPhi0IndexInCodebook(x_pattern, 6, 6);     // 後半6ビット
+  
+  if(phi0_i_idx == -1 || phi0_i1_idx == -1) {
+    // codebookにない場合は従来の方法（前のエラー状態を考慮しない）
+    for(int error_state = 0; error_state < 4; error_state++){
+      event_posteriors[error_state] = CalcPexNewWithErrorState(y, x, Nu2, Nu, error_state);
+    }
+    delete [] X;
+    return event_posteriors;
+  }
+  
+  // 観測配列yをDNA配列に変換
+  std::vector<char> observed_y_chars = longToDNAVector(y, Nu2);
+  
+  // 4096通りのmパターンで周辺化（calc_probアプローチ）
+  for(int m_pattern_int = 0; m_pattern_int < 4096; m_pattern_int++) {
+    
+    // m_pattern_intを12ビットのバイナリ配列に変換
+    std::vector<int> m_pattern(12);
+    for(int bit = 0; bit < 12; bit++) {
+      m_pattern[11-bit] = (m_pattern_int >> bit) & 1;
+    }
+    
+    // このmパターンでのk-merを構築
+    std::string kmer = buildKmerFromPhi0PatternsIntegrated(phi0_i_idx, phi0_i1_idx, m_pattern);
+    
+    // 各イベントについて計算
+    for(int event = 0; event < 4; event++) {
+      
+      // 尤度（3D格子計算）：P(observed_y | φ0, m, event, drifts)
+      double likelihood = compute3DLatticeIntegrated(kmer, observed_y_chars, event);
+      
+      // ★重要：前のエラー状態を考慮した事前確率
+      // P(event | previous_error_state, k-mer) 
+      double prior_prob = getTransitionProbabilityWithPreviousState(kmer, previous_error_state, event);
+      
+      // m事前確率（均等分布と仮定）
+      double m_prior = 1.0 / 4096.0;
+      
+      // 結合確率：P(event, m | observed_y, φ0, previous_error_state)
+      double joint_prob = likelihood * prior_prob * m_prior;
+      
+      // 事後確率に累積
+      event_posteriors[event] += joint_prob;
+    }
+  }
+  
+  // 正規化
+  double total_prob = 0.0;
+  for(int e = 0; e < 4; e++) {
+    total_prob += event_posteriors[e];
+  }
+  
+  if(total_prob > 0.0) {
+    for(int e = 0; e < 4; e++) {
+      event_posteriors[e] /= total_prob;
+    }
+  } else {
+    // フォールバック：均等分布
+    for(int e = 0; e < 4; e++) {
+      event_posteriors[e] = 0.25;
+    }
+  }
+  
+  delete [] X;
+  return event_posteriors;
 }
 
 //================================================================================
@@ -1905,13 +2113,34 @@ void SLFBAdec::CalcPF(int idx, int Nb2){
 	for(xi=0;xi<Q;xi++){
 	  //ICB->Get_CW(X,xi);
 	  //x  = VectToLong(X,Nu);
-	  ss = PU[idx][xi] * GetGX(Nu2,y,xi);
+	  // Julia DNAチャネル統合: 全エラー状態について和を計算
+	  // P(y, x, u, d, e) = Σ_e P(u'_i|u_i) × P(y|φ0(u'_i), e_iv, d_iv, d_(i+1)v) × P(e_(i+1)v|e_iv, conditions)
+	  double error_sum = 0.0;
+	  for(int e = 0; e < 4; e++) {
+	    // P(y|φ0(u'_i), e_iv, d_iv, d_(i+1)v): GXNew - 観測確率（エラー状態条件付き）
+	    double gx_prob = GetGXNew(Nu2, y, xi, e);
+	    
+	    // P(e_(i+1)v|e_iv, φ0(...), d_iv, d_(i+1)v): GENew - エラー状態遷移確率
+	    // idx==0では前のエラー状態を0(Match)と仮定
+	    int prev_e = (idx == 0) ? 0 : e; // 簡易版: 前のエラー状態（後で改良可能）
+	    double ge_prob = GetGENew(Nu2, y, xi, prev_e);
+	    
+	    error_sum += gx_prob * ge_prob;
+	  }
+	  ss = PU[idx][xi] * error_sum;
 	  s += ss;
 	  //(dbg)
 	  //printf("%e d1=%d d0=%d Nu2=%d iL=%d iR=%d y=%ld xi=%d x=%ld\n",ss,d1,d0,Nu2,iL,iR,y,xi,x);
 	} // for xi
       } else {
-	s = GetGX(Nu2,0,0);
+	// 近似値処理：Nu2範囲外でも全エラー状態について和を計算
+	double error_sum_approx = 0.0;
+	for(int e = 0; e < 4; e++) {
+	  double gx_prob_approx = GetGXNew(Nu2, 0, 0, e);
+	  double ge_prob_approx = GetGENew(Nu2, 0, 0, 0); // 簡易版: prev_e=0と仮定
+	  error_sum_approx += gx_prob_approx * ge_prob_approx;
+	}
+	s = error_sum_approx;
       } // if Nu2
       PF[idx+1][d1-Dmin] += (s*PF[idx][d0-Dmin]);
     } // for d0
@@ -1944,13 +2173,34 @@ void SLFBAdec::CalcPB(int idx, int Nb2){
 	for(xi=0;xi<Q;xi++){
 	  //ICB->Get_CW(X,xi);
 	  //x  = VectToLong(X,Nu);
-	  ss = PU[idx][xi] * GetGX(Nu2,y,xi);
+	  // Julia DNAチャネル統合: 全エラー状態について和を計算（Backward）
+	  // P(y, x, u, d, e) = Σ_e P(u'_i|u_i) × P(y|φ0(u'_i), e_iv, d_iv, d_(i+1)v) × P(e_(i+1)v|e_iv, conditions)
+	  double error_sum = 0.0;
+	  for(int e = 0; e < 4; e++) {
+	    // P(y|φ0(u'_i), e_iv, d_iv, d_(i+1)v): GXNew - 観測確率（エラー状態条件付き）
+	    double gx_prob = GetGXNew(Nu2, y, xi, e);
+	    
+	    // P(e_(i+1)v|e_iv, φ0(...), d_iv, d_(i+1)v): GENew - エラー状態遷移確率
+	    // Backward計算でも同じ前エラー状態推定を使用
+	    int prev_e = (idx == 0) ? 0 : e; // 簡易版: 前のエラー状態（後で改良可能）
+	    double ge_prob = GetGENew(Nu2, y, xi, prev_e);
+	    
+	    error_sum += gx_prob * ge_prob;
+	  }
+	  ss = PU[idx][xi] * error_sum;
 	  s += ss;
 	  //(dbg)
 	  //printf("%e d1=%d d0=%d Nu2=%d iL=%d iR=%d y=%ld xi=%d x=%ld\n",ss,d1,d0,Nu2,iL,iR,y,xi,x);
 	} // for xi
       } else {
-	s = GetGX(Nu2,0,0);
+	// 近似値処理：Nu2範囲外でも全エラー状態について和を計算（Backward）
+	double error_sum_approx = 0.0;
+	for(int e = 0; e < 4; e++) {
+	  double gx_prob_approx = GetGXNew(Nu2, 0, 0, e);
+	  double ge_prob_approx = GetGENew(Nu2, 0, 0, 0); // 簡易版: prev_e=0と仮定
+	  error_sum_approx += gx_prob_approx * ge_prob_approx;
+	}
+	s = error_sum_approx;
       } // if Nu2
       PB[idx][d0-Dmin] += (s*PB[idx+1][d1-Dmin]);
     } // for d1
@@ -1982,7 +2232,21 @@ void SLFBAdec::CalcPD(int idx, int Nb2){
 	iR  = (idx+1)*Nu + d1 - 1;
 	if( (Nu2<0) || (Nu2>2*Nu) || (iL<0) || (iL>=Nb2) || (iR<-1) || (iR>=Nb2) ) continue;
 	y = VectToLong( &Yin[iL], Nu2 );
-	ss = PF[idx][d0-Dmin] * GetGX(Nu2,y,xi);
+	// Julia DNAチャネル統合: 全エラー状態について和を計算（Posterior）
+	// P(y, x, u, d, e) = Σ_e P(y|φ0(u'_i), e_iv, d_iv, d_(i+1)v) × P(e_(i+1)v|e_iv, conditions)
+	double error_sum = 0.0;
+	for(int e = 0; e < 4; e++) {
+	  // P(y|φ0(u'_i), e_iv, d_iv, d_(i+1)v): GXNew - 観測確率（エラー状態条件付き）
+	  double gx_prob = GetGXNew(Nu2, y, xi, e);
+	  
+	  // P(e_(i+1)v|e_iv, φ0(...), d_iv, d_(i+1)v): GENew - エラー状態遷移確率
+	  // Posterior計算でも同じ前エラー状態推定を使用
+	  int prev_e = (idx == 0) ? 0 : e; // 簡易版: 前のエラー状態（後で改良可能）
+	  double ge_prob = GetGENew(Nu2, y, xi, prev_e);
+	  
+	  error_sum += gx_prob * ge_prob;
+	}
+	ss = PF[idx][d0-Dmin] * error_sum;
 	s += ss;
 	//(dbg)
 	//printf("%e d1=%d d0=%d Nu2=%d iL=%d iR=%d y=%ld xi=%d x=%ld\n",ss,d1,d0,Nu2,iL,iR,y,xi,x);
@@ -2032,9 +2296,9 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   assert(ECM->GetM()==Q && ECM->GetN()==Q);
   assert(Pt>0.0 && Pt<=1.0);
   //----- set tables
-  printf("# SLFBAdec: generating GD & GX\n");
+  printf("# SLFBAdec: generating GD\n");
   SetGD();
-  SetGX();
+  // SetGX();  // GXはもう使用しないためコメントアウト
   printf("# SLFBAdec: generating GXNew\n");
   SetGXNew();
   printf("# SLFBAdec: generating GENew\n");
@@ -2046,7 +2310,7 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
 //================================================================================
 SLFBAdec::~SLFBAdec(){
   DelGD();
-  DelGX();
+  // DelGX();  // GXはもう使用しないためコメントアウト
   DelGXNew();
   DelGENew();
   DelFG();

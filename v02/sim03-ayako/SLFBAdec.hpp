@@ -75,10 +75,13 @@ private:
   std::string buildKmerFromPhi0PatternsIntegrated(int phi0_i_idx, int phi0_i1_idx, const std::vector<int>& m_pattern);
   double compute3DLatticeIntegrated(const std::string& kmer, const std::vector<char>& observed_y, int target_event);
   double getTransitionProbability(const std::string& kmer, int event);
+  double getTransitionProbabilityWithPreviousState(const std::string& kmer, int previous_error_state, int event);  // e_iv考慮版
   void outputLatticeDebug(const std::vector<std::vector<std::vector<double>>>& lattice,
                          int target_i, int target_j, const std::string& description,
                          std::ofstream& debug_file);
-  double GetGENew(int Nu2, long y, long xi);
+  double GetGENew(int Nu2, long y, long xi, int previous_error_state);  // e_ivを考慮
+  void ExpandGENewWithPreviousState(int ly, int previous_error_state);  // e_iv考慮版の拡張
+  std::array<double,4> computeEventProbabilityDistributionWithPreviousState(int Nu2, long y, long xi, int previous_error_state);  // e_iv考慮版の確率分布計算
   // k-mer確率テーブル関連メソッド
   void loadTransitionProbabilities(int k);
   std::string binaryToDNA(const unsigned char* binary_seq, int length);

@@ -22,7 +22,7 @@ int convert_dna_to_bits(const std::string& dna_result, unsigned char* bits, int 
 
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 100000
+#define WCmax 10
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 
