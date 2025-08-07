@@ -1395,19 +1395,74 @@ std::string SLFBAdec::buildKmerFromPhi0PatternsIntegrated(int phi0_i_idx, int ph
 }
 
 double SLFBAdec::compute3DLatticeIntegrated(const std::string& kmer, const std::vector<char>& observed_y, int target_event) {
-  // 簡略版3D格子計算
-  // 実際の尤度計算の代わりに、k-mer依存の固定確率を返す
-  if(transition_probs.find(kmer) != transition_probs.end() &&
-     transition_probs[kmer].find(target_event) != transition_probs[kmer].end()) {
-    
-    auto& probs = transition_probs[kmer][target_event]; 
-    if(target_event < static_cast<int>(probs.size())) {
-      return probs[target_event] * 0.1; // 暫定的な尤度重み
+  // calc_prob/eLattice_v8.cpp同等の完全3D格子計算
+  
+  int lx = kmer.length();
+  int ly = observed_y.size();
+  
+  if(lx == 0 || ly == 0) {
+    return 0.01; // デフォルト尤度
+  }
+  
+  // 3D格子の初期化 [i][j][event]
+  std::vector<std::vector<std::vector<double>>> F(lx + 1, 
+    std::vector<std::vector<double>>(ly + 1, std::vector<double>(4, 0.0)));
+  
+  // 初期条件
+  F[0][0][0] = 1.0; // Match状態で開始
+  
+  // 動的プログラミング
+  for(int i = 0; i <= lx; i++) {
+    for(int j = 0; j <= ly; j++) {
+      for(int prev_event = 0; prev_event < 4; prev_event++) {
+        if(F[i][j][prev_event] == 0.0) continue;
+        
+        // Match/Substitution: i+1, j+1
+        if(i < lx && j < ly) {
+          for(int curr_event = 0; curr_event < 4; curr_event++) {
+            double transition_prob = getTransitionProbabilityWithPreviousState(kmer, prev_event, curr_event);
+            double emission_prob = 1.0;
+            
+            // 発生確率の計算
+            if(curr_event == 0) { // Match
+              emission_prob = (kmer[i] == observed_y[j]) ? 0.9 : 0.1;
+            } else if(curr_event == 3) { // Substitution
+              emission_prob = (kmer[i] != observed_y[j]) ? 0.8 : 0.2;
+            } else {
+              emission_prob = 0.1; // Insertion/Deletion
+            }
+            
+            F[i+1][j+1][curr_event] += F[i][j][prev_event] * transition_prob * emission_prob;
+          }
+        }
+        
+        // Deletion: i+1, j
+        if(i < lx) {
+          double del_transition = getTransitionProbabilityWithPreviousState(kmer, prev_event, 2);
+          F[i+1][j][2] += F[i][j][prev_event] * del_transition * 0.1;
+        }
+        
+        // Insertion: i, j+1
+        if(j < ly) {
+          double ins_transition = getTransitionProbabilityWithPreviousState(kmer, prev_event, 1);
+          F[i][j+1][1] += F[i][j][prev_event] * ins_transition * 0.1;
+        }
+      }
     }
   }
   
-  // デフォルト尤度
-  return 0.01;
+  // 終端確率を計算
+  double total_likelihood = 0.0;
+  for(int final_event = 0; final_event < 4; final_event++) {
+    total_likelihood += F[lx][ly][final_event];
+  }
+  
+  // 特定のイベントでの終端確率を返す
+  if(target_event >= 0 && target_event < 4) {
+    return (total_likelihood > 0.0) ? F[lx][ly][target_event] / total_likelihood : 0.01;
+  } else {
+    return total_likelihood;
+  }
 }
 
 double SLFBAdec::getTransitionProbability(const std::string& kmer, int event) {
@@ -1439,6 +1494,68 @@ double SLFBAdec::getTransitionProbabilityWithPreviousState(const std::string& km
   
   // 2. フォールバック: 前のエラー状態を考慮しない従来の確率
   return getTransitionProbability(kmer, event);
+}
+
+// estimatePreviousErrorState: 前方後方アルゴリズムによる前のエラー状態推定
+int SLFBAdec::estimatePreviousErrorState(int idx, int xi, int d0, int d1, int Nu2, long y) {
+  // Forward/Backward確率が計算済みであることを前提とする
+  if(idx <= 0) {
+    return 0; // 最初の状態はMatch(0)と仮定
+  }
+  
+  // 前の時刻でのエラー状態事後確率を計算
+  std::vector<double> posteriors = computeErrorStatePosteriors(idx-1, xi, d0, d1, Nu2, y);
+  
+  // 最大事後確率のエラー状態を選択
+  int best_error_state = 0;
+  double max_posterior = posteriors[0];
+  for(int e = 1; e < 4; e++) {
+    if(posteriors[e] > max_posterior) {
+      max_posterior = posteriors[e];
+      best_error_state = e;
+    }
+  }
+  
+  return best_error_state;
+}
+
+// computeErrorStatePosteriors: エラー状態の事後確率計算
+std::vector<double> SLFBAdec::computeErrorStatePosteriors(int idx, int xi, int d0, int d1, int Nu2, long y) {
+  std::vector<double> posteriors(4, 0.0);
+  
+  if(idx < 0 || idx >= Ns) {
+    // 範囲外の場合は均等分布
+    for(int e = 0; e < 4; e++) {
+      posteriors[e] = 0.25;
+    }
+    return posteriors;
+  }
+  
+  // 各エラー状態について事後確率を計算
+  double total_prob = 0.0;
+  for(int e = 0; e < 4; e++) {
+    // Forward確率 × 観測尤度 × Backward確率の近似
+    double forward_prob = (idx > 0) ? PF[idx][d0-Dmin] : 1.0;
+    double backward_prob = (idx < Ns-1) ? PB[idx+1][d1-Dmin] : 1.0;
+    double likelihood = GetGXNew(Nu2, y, xi, e);
+    
+    posteriors[e] = forward_prob * likelihood * backward_prob;
+    total_prob += posteriors[e];
+  }
+  
+  // 正規化
+  if(total_prob > 0.0) {
+    for(int e = 0; e < 4; e++) {
+      posteriors[e] /= total_prob;
+    }
+  } else {
+    // フォールバック: 均等分布
+    for(int e = 0; e < 4; e++) {
+      posteriors[e] = 0.25;
+    }
+  }
+  
+  return posteriors;
 }
 
 double SLFBAdec::CalcPexNew(long y, long x, int ly, int lx){
@@ -2121,8 +2238,8 @@ void SLFBAdec::CalcPF(int idx, int Nb2){
 	    double gx_prob = GetGXNew(Nu2, y, xi, e);
 	    
 	    // P(e_(i+1)v|e_iv, φ0(...), d_iv, d_(i+1)v): GENew - エラー状態遷移確率
-	    // idx==0では前のエラー状態を0(Match)と仮定
-	    int prev_e = (idx == 0) ? 0 : e; // 簡易版: 前のエラー状態（後で改良可能）
+	    // 前方後方アルゴリズムによる正確な前のエラー状態推定
+	    int prev_e = estimatePreviousErrorState(idx, xi, d0, d1, Nu2, y);
 	    double ge_prob = GetGENew(Nu2, y, xi, prev_e);
 	    
 	    error_sum += gx_prob * ge_prob;
@@ -2181,8 +2298,8 @@ void SLFBAdec::CalcPB(int idx, int Nb2){
 	    double gx_prob = GetGXNew(Nu2, y, xi, e);
 	    
 	    // P(e_(i+1)v|e_iv, φ0(...), d_iv, d_(i+1)v): GENew - エラー状態遷移確率
-	    // Backward計算でも同じ前エラー状態推定を使用
-	    int prev_e = (idx == 0) ? 0 : e; // 簡易版: 前のエラー状態（後で改良可能）
+	    // 前方後方アルゴリズムによる正確な前のエラー状態推定（Backward）
+	    int prev_e = estimatePreviousErrorState(idx, xi, d0, d1, Nu2, y);
 	    double ge_prob = GetGENew(Nu2, y, xi, prev_e);
 	    
 	    error_sum += gx_prob * ge_prob;
@@ -2240,8 +2357,8 @@ void SLFBAdec::CalcPD(int idx, int Nb2){
 	  double gx_prob = GetGXNew(Nu2, y, xi, e);
 	  
 	  // P(e_(i+1)v|e_iv, φ0(...), d_iv, d_(i+1)v): GENew - エラー状態遷移確率
-	  // Posterior計算でも同じ前エラー状態推定を使用
-	  int prev_e = (idx == 0) ? 0 : e; // 簡易版: 前のエラー状態（後で改良可能）
+	  // 前方後方アルゴリズムによる正確な前のエラー状態推定（Posterior）
+	  int prev_e = estimatePreviousErrorState(idx, xi, d0, d1, Nu2, y);
 	  double ge_prob = GetGENew(Nu2, y, xi, prev_e);
 	  
 	  error_sum += gx_prob * ge_prob;

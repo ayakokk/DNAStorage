@@ -76,6 +76,9 @@ private:
   double compute3DLatticeIntegrated(const std::string& kmer, const std::vector<char>& observed_y, int target_event);
   double getTransitionProbability(const std::string& kmer, int event);
   double getTransitionProbabilityWithPreviousState(const std::string& kmer, int previous_error_state, int event);  // e_iv考慮版
+  // エラー状態推定メソッド（前方後方アルゴリズム活用）
+  int estimatePreviousErrorState(int idx, int xi, int d0, int d1, int Nu2, long y);
+  std::vector<double> computeErrorStatePosteriors(int idx, int xi, int d0, int d1, int Nu2, long y);
   void outputLatticeDebug(const std::vector<std::vector<std::vector<double>>>& lattice,
                          int target_i, int target_j, const std::string& description,
                          std::ofstream& debug_file);
