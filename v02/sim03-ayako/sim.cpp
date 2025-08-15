@@ -22,7 +22,7 @@ int convert_dna_to_bits(const std::string& dna_result, unsigned char* bits, int 
 
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 100
+#define WCmax 10
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 
@@ -256,12 +256,36 @@ int main(int argc, char *argv[]){
     es += ec;
     ecmax = max(ec,ecmax);
 
+    // デバッグ出力：最初の5ブロックのみ詳細表示
+    if(wc <= 5) {
+      printf("=== Block %d ===\n", wc);
+      printf("Sent symbols (IW): ");
+      for(int i=0; i<N; i++) printf("%2d ", IW[i]);
+      printf("\n");
+      printf("Sent codeword (CW): ");
+      for(int i=0; i<Nb; i++) printf("%d", CW[i]);
+      printf("\n");
+      printf("Received bits (RW): ");
+      for(int i=0; i<Nb2; i++) printf("%d", RW[i]);
+      printf(" (length=%d)\n", Nb2);
+      printf("Decoded symbols (DW): ");
+      for(int i=0; i<N; i++) printf("%2d ", DW[i]);
+      printf("\n");
+      printf("Errors in this block: ");
+      for(int i=0; i<N; i++) {
+        if(IW[i] != DW[i]) printf("X%d ", i);
+      }
+      printf("\n");
+      printf("Block error count: %ld/%d (%.1f%%)\n", ec, N, (double)ec/N*100);
+      printf("Nb2=%d (received bits)\n\n", Nb2);
+    }
+
     if(wc%1000==0 || wc==WCmax){
       printf("%04d %ld/%ld %ld %e : %e %e %e\n",
 	     wc,es,(long)wc*N,ecmax,(double)es/(wc*N), DCM->Hx(), DCM->Hxy(), DCM->Ixy());
     } // if wc 
 
-    //(dbg)
+    //(dbg) - 既存のデバッグ出力はコメントアウトのまま
     //CH->GetDR(dbgDR);
     //dbgPrint(IW,DW,CW,RW,(const double**)Pout,dbgDR,Nb,Nb2,Nu,Q);
     //printf("%04d %ld %ld/%ld %e\n",wc,ec,es,(long)wc*N,(double)es/(wc*N));
@@ -357,11 +381,11 @@ void dbgPrint(const int *IW, const int *DW,
 // Convert binary bits to DNA sequence (2 bits per base: 00=A, 01=C, 10=G, 11=T)
 
 /**
- * @brief ビット列をランダムなビットと組み合わせてDNA配列に変換する
- * * 各入力ビット `bits[i]` を下位ビットとし、ランダムに生成したビットを
- * 上位ビットとして2ビットのペアを生成し、対応するDNA塩基に変換する。
- * (00:A, 01:C, 10:G, 11:T)
- * * @param bits 変換するビット(0または1)を格納したunsigned char型の配列
+ * @brief 符号語ビット列をランダムビットと組み合わせてDNA配列に変換する
+ * 各符号語ビット `bits[i]` を上位ビットとし、ランダム生成ビットを
+ * 下位ビットとして2ビットペアを生成し、DNA塩基に変換する。
+ * (00:A, 01:C, 10:G, 11:T - binary_dna_mapping.txt参照)
+ * @param bits 変換する符号語ビット列
  * @param len 配列の長さ
  * @return std::string 変換後のDNA配列
  */
@@ -374,14 +398,15 @@ std::string convert_bits_to_dna(const unsigned char* bits, int len) {
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, 1); // 0または1のランダムなビットを生成
 
-    for(int i = 0; i < len; i += 2) {
+    // 修正: 全てのビットを使用し、符号語ビットを上位に配置
+    for(int i = 0; i < len; i++) {
         //　ランダムなビットを生成
         unsigned char random_bit = dis(gen);
 
-        //入力ビットを取得
-        unsigned char input_bit = bits[i];
-        // ランダムビットを入力ビットでペアを作成
-        unsigned char pair = (random_bit << 1) | input_bit;
+        //符号語ビットを取得
+        unsigned char codeword_bit = bits[i];
+        // 符号語ビットを上位、ランダムビットを下位に配置
+        unsigned char pair = (codeword_bit << 1) | random_bit;
         switch(pair) {
             case 0: dna += "A"; break;  // 00
             case 1: dna += "C"; break;  // 01
@@ -393,34 +418,31 @@ std::string convert_bits_to_dna(const unsigned char* bits, int len) {
 }
 
 // Convert DNA sequence back to binary bits
+// 修正: 上位ビット（符号語ビット）のみを抽出
 int convert_dna_to_bits(const std::string& dna_result, unsigned char* bits, int max_bits) {
     int bit_len = 0;
-    for(int i = 0; i < dna_result.length() && bit_len + 1 < max_bits; i++) {
+    for(int i = 0; i < dna_result.length() && bit_len < max_bits; i++) {
         char base = dna_result[i];
+        unsigned char codeword_bit = 0;
         switch(base) {
             case 'A': case 'a':
-                if(bit_len + 1 < max_bits) {
-                    bits[bit_len++] = 0; bits[bit_len++] = 0;
-                }
+                codeword_bit = 0; // 00の上位ビット
                 break;
             case 'C': case 'c':
-                if(bit_len + 1 < max_bits) {
-                    bits[bit_len++] = 0; bits[bit_len++] = 1;
-                }
+                codeword_bit = 0; // 01の上位ビット  
                 break;
             case 'G': case 'g':
-                if(bit_len + 1 < max_bits) {
-                    bits[bit_len++] = 1; bits[bit_len++] = 0;
-                }
+                codeword_bit = 1; // 10の上位ビット
                 break;
             case 'T': case 't':
-                if(bit_len + 1 < max_bits) {
-                    bits[bit_len++] = 1; bits[bit_len++] = 1;
-                }
+                codeword_bit = 1; // 11の上位ビット
                 break;
             default:
                 // Skip unknown characters
-                break;
+                continue;
+        }
+        if(bit_len < max_bits) {
+            bits[bit_len++] = codeword_bit;
         }
     }
     return bit_len;

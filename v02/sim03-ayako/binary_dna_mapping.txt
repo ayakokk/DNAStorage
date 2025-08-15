@@ -1,0 +1,19 @@
+# Binary to DNA Mapping Reference
+# Used in both sim.cpp and SLFBAdec.cpp for consistency
+
+# Binary Pair → DNA Base
+00 → A
+01 → C  
+10 → G
+11 → T
+
+# Conversion Examples:
+# [10][00][11][01] → G-A-T-C
+# [01][10][00][11] → C-G-A-T
+
+# Usage:
+# - sim.cpp: convert_bits_to_dna() function
+# - SLFBAdec.cpp: binaryToDNA() function  
+# - Both must use identical mapping for consistency
+
+# Note: Upper bit = codeword bit, Lower bit = random bit

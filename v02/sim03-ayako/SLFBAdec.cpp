@@ -1826,9 +1826,10 @@ void SLFBAdec::loadTransitionProbabilities(int k) {
 
 //================================================================================
 std::string SLFBAdec::binaryToDNA(const unsigned char* binary_seq, int length) {
-  // バイナリペアをDNA塩基に変換するテーブル
+  // バイナリペアをDNA塩基に変換するテーブル（sim.cppと統一）
+  // binary_dna_mapping.txt参照: 00:A, 01:C, 10:G, 11:T
   std::map<std::pair<int,int>, char> binary_to_dna = {
-    {{0,0}, 'A'}, {{0,1}, 'T'}, {{1,0}, 'G'}, {{1,1}, 'C'}
+    {{0,0}, 'A'}, {{0,1}, 'C'}, {{1,0}, 'G'}, {{1,1}, 'T'}
   };
   
   std::string dna_seq;
