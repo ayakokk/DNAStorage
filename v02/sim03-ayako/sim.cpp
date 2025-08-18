@@ -21,8 +21,8 @@ int transmit_dna_channel(unsigned char* RW, const unsigned char* CW, int Nb, cla
 int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symbols, int max_symbols);
 
 #define BSIZE 8192
-#define OutListSize 3
-#define WCmax 1  // 完全にループを無効化してメモリ確保のみテスト
+#define OutListSize 1
+#define WCmax 100  // 完全にループを無効化してメモリ確保のみテスト
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 
@@ -249,10 +249,16 @@ int main(int argc, char *argv[]){
   int wc;
   long ec,ecmax=0,es=0;
   
-  // Initialize DNA channel server (temporarily disabled for debugging)
-  printf("# [DEBUG] Skipping DNA channel server initialization\n"); fflush(stdout);
-  g_dna_server = nullptr;  // Disable DNA server for now
-  printf("# [DEBUG] DNA channel server initialization skipped\n"); fflush(stdout);
+  // Initialize DNA channel server
+  printf("# [DEBUG] Initializing DNA channel server\n"); fflush(stdout);
+  g_dna_server = new DNAChannelServer();
+  if(!g_dna_server->initialize()) {
+    fprintf(stderr, "Error: Failed to initialize DNA channel server\n");
+    delete g_dna_server;
+    g_dna_server = nullptr;
+    return 1;
+  }
+  printf("# [DEBUG] DNA channel server initialization completed\n"); fflush(stdout);
   
   //-----
   printf("# [DEBUG] Starting simulation loop (WCmax=%d)\n", WCmax); fflush(stdout);
