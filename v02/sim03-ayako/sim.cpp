@@ -22,7 +22,7 @@ int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symb
 
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 0  // 完全にループを無効化してメモリ確保のみテスト
+#define WCmax 1  // 完全にループを無効化してメモリ確保のみテスト
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 

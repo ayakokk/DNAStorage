@@ -1,7 +1,7 @@
 # GENew Precomputed Data Metadata
-# Generated on: Aug  7 2025 15:11:51
+# Generated on: Aug 18 2025 16:05:23
 Nu=6
-Q=18
+Q=1152
 Pi=5.000000e-02
 Pd=5.000000e-02
 Ps=5.000000e-02
