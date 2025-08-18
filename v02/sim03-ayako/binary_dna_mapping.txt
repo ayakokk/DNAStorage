@@ -2,10 +2,10 @@
 # Used in both sim.cpp and SLFBAdec.cpp for consistency
 
 # Binary Pair → DNA Base
-00 → A
-01 → C  
-10 → G
-11 → T
+00 → A → 0
+01 → C → 1
+10 → G → 2
+11 → T → 3
 
 # Conversion Examples:
 # [10][00][11][01] → G-A-T-C

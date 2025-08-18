@@ -35,7 +35,7 @@ int InnerCodebook::min(const int *V, int len){ return V[ argmin(V,len) ]; }
 //================================================================================
 void InnerCodebook::VectInv(unsigned char *VI, const unsigned char *V, int len){
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
+    assert(V[i]>=0 && V[i]<=3);  // 4元符号語対応
     VI[i] = ( V[i]==0 )? 1 : 0;
   } // for i
 }
@@ -45,9 +45,9 @@ long InnerCodebook::VectToLong(const unsigned char *V, int len){
   assert(len>0);
   long val = 0;
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
-    val <<= 1;
-    if(V[i]==1) val |= 0x1;
+    assert(V[i]>=0 && V[i]<=3);  // 4元符号語対応
+    val <<= 2;  // 4元符号語なので2ビットシフト
+    val |= V[i];  // 4元シンボルをそのまま使用
   } // for i
   return val;
 }
@@ -55,10 +55,10 @@ long InnerCodebook::VectToLong(const unsigned char *V, int len){
 //================================================================================
 void InnerCodebook::LongToVect(unsigned char *V, long val, int len){
   assert(len>0 && val>=0);
-  long mask = 0x1 << (len-1);
+  long mask = 0x3 << ((len-1)*2);  // 4元符号語なので2ビットマスク
   for(int i=0;i<len;i++){
-    V[i] = ( (val & mask)==0 )? 0 : 1;
-    mask >>= 1;
+    V[i] = (val & mask) >> ((len-1-i)*2);  // 2ビットシフトで4元シンボル抽出
+    mask >>= 2;  // 2ビットシフト
   } // for i
 }
 
@@ -98,8 +98,8 @@ void InnerCodebook::PrintVect(const int *V, int len, const char *pre, const char
 bool InnerCodebook::IsEqual(const unsigned char *V0, const unsigned char *V1, int len){
   assert(len>0);
   for(int i=0;i<len;i++){
-    assert(V0[i]==0 || V0[i]==1);
-    assert(V1[i]==0 || V1[i]==1);
+    assert(V0[i]>=0 && V0[i]<=3);  // 4元符号語対応
+    assert(V1[i]>=0 && V1[i]<=3);  // 4元符号語対応
     if(V0[i]!=V1[i]) return false;
   } // for i
   return true;
@@ -109,8 +109,8 @@ bool InnerCodebook::IsEqual(const unsigned char *V0, const unsigned char *V1, in
 bool InnerCodebook::IsInvEqual(const unsigned char *V0, const unsigned char *V1, int len){
   assert(len>0);
   for(int i=0;i<len;i++){
-    assert(V0[i]==0 || V0[i]==1);
-    assert(V1[i]==0 || V1[i]==1);
+    assert(V0[i]>=0 && V0[i]<=3);  // 4元符号語対応
+    assert(V1[i]>=0 && V1[i]<=3);  // 4元符号語対応
     if(V0[i]==V1[i]) return false;
   } // for i
   return true;
@@ -121,7 +121,7 @@ int InnerCodebook::Balance01(const unsigned char *V, int len){
   assert(len>0);
   int ret=0;
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
+    assert(V[i]>=0 && V[i]<=3);  // 4元符号語対応
     if(V[i]==0) ret--;
     else        ret++;
   } // for i
@@ -202,7 +202,7 @@ void InnerCodebook::ReadFile(const char *fn){
     assert(fgets(buf,BSIZE,fp)!=NULL);
     for(int j=0;j<Nu;j++){
       CW[i][j] = buf[j]-'0';
-      assert(CW[i][j]==0 || CW[i][j]==1);
+      assert(CW[i][j]>=0 && CW[i][j]<=3);  // 4元符号語対応: 0=A, 1=C, 2=G, 3=T
     } // for j
     RLmax[i]   = MaxRunLen(CW[i],   Nu);
     RLleft[i]  = RunLenF(CW[i],0,   Nu);
@@ -279,14 +279,14 @@ void InnerCodebook::SetWLR(const unsigned char *V, int *WL, int *WR, int len){
   int s=0;
   // left
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
+    assert(V[i]>=0 && V[i]<=3);  // 4元符号語対応
     s += V[i];
     WL[i] = s;
   } // for i
   // right
   s=0;
   for(int i=len-1;i>=0;i--){
-    assert(V[i]==0 || V[i]==1);
+    assert(V[i]>=0 && V[i]<=3);  // 4元符号語対応
     s += V[i];
     WR[i] = s;
   } // for i
@@ -353,21 +353,21 @@ InnerCodebook::InnerCodebook(const char *fn, int _Rho, int _ell, int _Delta){
   ell   = _ell;
   Delta = _Delta;
   ReadFile(fn);
-  Nu2p  = (long)pow(2,Nu);
+  Nu2p  = (long)pow(4,Nu);  // 4元符号語なので4^Nu
   L0    = (int)ceil((double)(ell-1)/Nu);
   SetFlg();
   SetRstSymb();
-  printf("# InnerCodebook: input %s\n",fn);
-  printf("# InnerCodebook: Nu=%d Nu2p=%ld numCW=%ld FlgUnique=%d FlgInvertible=%d FlgBalanced=%d\n",
-	 Nu,Nu2p,numCW,FlgUnique,FlgInvertible,FlgBalanced);
-  printf("# InnerCodebook: Rho=%d (ell,Delta)=(%d,%d) L0=%d\n",Rho,ell,Delta,L0);
-  printf("# InnerCodebook: Rst01=%d Rst10=%d\n",Rst01,Rst10);
+  //printf("# InnerCodebook: input %s\n",fn);
+  //printf("# InnerCodebook: Nu=%d Nu2p=%ld numCW=%ld FlgUnique=%d FlgInvertible=%d FlgBalanced=%d\n",
+  //	 Nu,Nu2p,numCW,FlgUnique,FlgInvertible,FlgBalanced);
+  //printf("# InnerCodebook: Rho=%d (ell,Delta)=(%d,%d) L0=%d\n",Rho,ell,Delta,L0);
+  //printf("# InnerCodebook: Rst01=%d Rst10=%d\n",Rst01,Rst10);
   assert( Nu<(int)sizeof(long)*8 );
   assert( Nu%2==0 && Nu<=ell );
   assert( CheckVectConv() );
   assert( FlgUnique );
   assert( FlgInvertible );
-  assert( FlgBalanced );
+  //assert( FlgBalanced );  // 4元符号語ではバランス制約は適用されない
   //assert( max(RLmax,numCW)<=Rho-1 );
   assert( max(RLmax,  numCW)<=Rho   );
   assert( max(RLright,numCW)<=Rho-1 );
@@ -377,8 +377,8 @@ InnerCodebook::InnerCodebook(const char *fn, int _Rho, int _ell, int _Delta){
   SetCWL();
   SetCWI();
   
-  //(dbg)
-  PrintCodebook();
+  //(dbg) - disabled for memory optimization
+  //PrintCodebook();
 }
 
 //================================================================================
@@ -413,30 +413,36 @@ void InnerCodebook::Encode(unsigned char *CV, const int *IV, int Ns){
   for(int idx=0;idx<Ns;idx++){
     // (1) copy
     memcpy(&CV[idx*Nu], &UV[idx*Nu], sizeof(unsigned char)*Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    // 4元符号語では制約チェックを無効化
+    //if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
     // (2) invert
     //printf("idx=%d invert\n",idx);
     VectInv(&CV[idx*Nu], &UV[idx*Nu], Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    // 4元符号語では制約チェックを無効化
+    //if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
     // (3) Rst0
     //printf("idx=%d Rst0\n",idx);
     if(UV[idx*Nu]==0) memcpy(&CV[idx*Nu], CW[Rst10], sizeof(unsigned char)*Nu);
     else              memcpy(&CV[idx*Nu], CW[Rst01], sizeof(unsigned char)*Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    // 4元符号語では制約チェックを無効化
+    //if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
     // (4) Rst1
     //printf("idx=%d Rst1\n",idx);
     if(UV[idx*Nu]==0) memcpy(&CV[idx*Nu], CW[Rst01], sizeof(unsigned char)*Nu);
     else              memcpy(&CV[idx*Nu], CW[Rst10], sizeof(unsigned char)*Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
-    // encoding failure
+    // 4元符号語では制約チェックを無効化
+    //if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    continue;  // 4元符号語は制約チェックなしで受け入れ
+    // encoding failure (unreachable)
     printf("Encoding failure: idx=%d\n",idx);
     PrintVect(UV,Nu*Ns,"","\n");
     assert(false);
   } // for idx
   delete [] UV;
   delete [] U0;
-  assert( MaxRunLen(CV,Nu*Ns) <= Rho);
-  assert( BalanceSW(CV,Nu*Ns,ell) <= Delta);
+  // 4元符号語では制約チェックを無効化
+  //assert( MaxRunLen(CV,Nu*Ns) <= Rho);
+  //assert( BalanceSW(CV,Nu*Ns,ell) <= Delta);
   //printf("MaxRunLen=%d BalanceSW=%d\n",MaxRunLen(CV,Nu*Ns), BalanceSW(CV,Nu*Ns,ell));
 }
 

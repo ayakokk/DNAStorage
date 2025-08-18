@@ -25,9 +25,9 @@ int SLFBAdec::min(int a, int b){return (a<b)? a : b;}
 
 //================================================================================
 double SLFBAdec::Psub(unsigned char a, unsigned char b){
-  assert( a==0 || a==1 );
-  assert( b==0 || b==1 );
-  return (a==b)? 1.0-Ps : Ps;
+  assert( a>=0 && a<=3 );  // 4元符号語対応
+  assert( b>=0 && b<=3 );  // 4元符号語対応
+  return (a==b)? 1.0-Ps : Ps/3.0;  // 4元符号語では誤り確率を3等分
 }
 
 //================================================================================
@@ -108,9 +108,9 @@ long SLFBAdec::VectToLong(const unsigned char *V, int len){
   assert(len>=0);
   long val = 0;
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
-    val <<= 1;
-    if(V[i]==1) val |= 0x1;
+    assert(V[i]>=0 && V[i]<=3);  // 4元符号語対応
+    val <<= 2;  // 4元符号語なので2ビットシフト
+    val |= V[i];  // 4元シンボルをそのまま使用
   } // for i
   return val;
 }
@@ -118,10 +118,10 @@ long SLFBAdec::VectToLong(const unsigned char *V, int len){
 //================================================================================
 void SLFBAdec::LongToVect(unsigned char *V, long val, int len){
   assert(len>0 && val>=0);
-  long mask = 0x1 << (len-1);
+  long mask = 0x3 << ((len-1)*2);  // 4元符号語なので2ビットマスク
   for(int i=0;i<len;i++){
-    V[i] = ( (val & mask)==0 )? 0 : 1;
-    mask >>= 1;
+    V[i] = (val & mask) >> ((len-1-i)*2);  // 2ビットシフトで4元シンボル抽出
+    mask >>= 2;  // 2ビットシフト
   } // for i
 }
 
@@ -291,7 +291,7 @@ void SLFBAdec::SetGXNew(){
   unsigned char *X = new unsigned char [Nu];
   GXNew = new double *** [Nu*2+1];
   for(int ly=0;ly<=Nu*2;ly++){
-    if(ly<Nu2min || ly>Nu2max){
+    if(ly<3 || ly>8){  // ly=3-8のみ正確計算、それ以外は近似
       // approximate
       GXNew[ly]    = new double ** [1];
       GXNew[ly][0] = new double * [1];
@@ -336,7 +336,7 @@ void SLFBAdec::SetGXNew(){
 void SLFBAdec::DelGXNew(){
   int i2p;
   for(int i=0;i<=Nu*2;i++){
-    if(i<Nu2min || i>Nu2max){
+    if(i<3 || i>8){  // ly=3-8のみ正確計算、それ以外は近似
       delete [] GXNew[i][0][0];
       delete [] GXNew[i][0];
       delete [] GXNew[i];
@@ -1787,9 +1787,11 @@ void SLFBAdec::loadTransitionProbabilities(int k) {
     std::streampos fileSize = file.tellg();
     file.seekg(0, std::ios::beg);
     
-    if (fileSize > 1000000) { // 1MB以上の場合は警告
+    if (fileSize > 100000) { // 100KB以上の場合は警告
       printf("# Warning: Large file detected (%ld bytes), limiting reads\n", (long)fileSize);
     }
+    
+    printf("# File size: %ld bytes\n", (long)fileSize);
     
     while (std::getline(file, line) && line_count < MAX_KMERS) {
       // 空行やコメント行をスキップ
@@ -2387,9 +2389,11 @@ void SLFBAdec::CalcPD(int idx, int Nb2){
 
 //================================================================================
 SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class IDSchannel *_CH){
+  printf("# [DEBUG] SLFBAdec Constructor START\n"); fflush(stdout);
   ICB  = _ICB;
   ECM  = _ECM;
   CH   = _CH;
+  printf("# [DEBUG] SLFBAdec: Basic assignments done\n"); fflush(stdout);
   Nu   = ICB->Get_Nu();
   Q    = ICB->Get_numCW();
   Nb   = CH->GetN();
@@ -2413,7 +2417,9 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
 	 Pi,Pd,Ps,Pt,Dmin,Dmax,Drng);
   printf("# SLFBAdec: k-mer length=%d\n",k_mer_length);
   printf("# SLFBAdec: loading transition probabilities\n");
+  printf("# [DEBUG] About to call loadTransitionProbabilities\n"); fflush(stdout);
   loadTransitionProbabilities(k_mer_length);
+  printf("# [DEBUG] loadTransitionProbabilities completed\n"); fflush(stdout);
   assert(Nb%Nu==0);
   assert(Nu<=NuMax);
   assert(ECM->GetM()==Q && ECM->GetN()==Q);
@@ -2422,12 +2428,15 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   printf("# SLFBAdec: generating GD\n");
   SetGD();
   // SetGX();  // GXはもう使用しないためコメントアウト
-  printf("# SLFBAdec: generating GXNew\n");
+  printf("# SLFBAdec: generating GXNew\n"); fflush(stdout);
   SetGXNew();
-  printf("# SLFBAdec: generating GENew\n");
+  printf("# [DEBUG] SetGXNew completed\n"); fflush(stdout);
+  printf("# SLFBAdec: generating GENew\n"); fflush(stdout);
   SetGENew();
-  printf("# SLFBAdec: generating factor graph\n");
+  printf("# [DEBUG] SetGENew completed\n"); fflush(stdout);
+  printf("# SLFBAdec: generating factor graph\n"); fflush(stdout);
   SetFG();
+  printf("# [DEBUG] SetFG completed\n"); fflush(stdout);
 }
 
 //================================================================================

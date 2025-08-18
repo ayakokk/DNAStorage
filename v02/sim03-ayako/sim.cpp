@@ -15,14 +15,14 @@
 #include "IDSchannel.hpp"
 #include "SLFBAdec.hpp"
 
-// DNA channel simulation functions
-std::string convert_bits_to_dna(const unsigned char* bits, int len);
+// DNA channel simulation functions for 4-ary codewords
+std::string convert_quaternary_to_dna(const unsigned char* symbols, int len);
 int transmit_dna_channel(unsigned char* RW, const unsigned char* CW, int Nb, class IDSchannel* CH);
-int convert_dna_to_bits(const std::string& dna_result, unsigned char* bits, int max_bits);
+int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symbols, int max_symbols);
 
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 10
+#define WCmax 0  // 完全にループを無効化してメモリ確保のみテスト
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 
@@ -185,6 +185,8 @@ static DNAChannelServer* g_dna_server = nullptr;
 
 //================================================================================
 int main(int argc, char *argv[]){
+  printf("# [DEBUG] Starting main function\n");
+  fflush(stdout);
   int Rho;         // run-length    [constraint.txt]
   int ell,Delta;   // local-balance [constraint.txt]
   int N;           // block length (symbols)
@@ -196,6 +198,8 @@ int main(int argc, char *argv[]){
   char *fncb    = new char [BSIZE];
   char *fnconst = new char [BSIZE];
   char *fncm    = new char [BSIZE];
+  printf("# [DEBUG] Command line args parsed\n");
+  fflush(stdout);
   if(argc!=4){
     fprintf(stderr,"Usage: %s <ICB_dir> <N> <seed|-1>\n",argv[0]);
     return 1;
@@ -210,11 +214,18 @@ int main(int argc, char *argv[]){
   snprintf(fncb,   BSIZE,"%s/cb.txt",        fn);  // inner codebook (in)
   snprintf(fnconst,BSIZE,"%s/constraint.txt",fn);  // constraints (in)
   snprintf(fncm,   BSIZE,"%s/EncCM.bin",     fn);  // encoding channel matrix (in)
+  printf("# [DEBUG] Reading constraints...\n"); fflush(stdout);
   ReadConstraints(fnconst, &Rho, &ell, &Delta);
+  printf("# [DEBUG] Creating InnerCodebook...\n"); fflush(stdout);
   class InnerCodebook *ICB = new class InnerCodebook(fncb,Rho,ell,Delta);
+  printf("# [DEBUG] InnerCodebook created successfully\n"); fflush(stdout);
+  printf("# [DEBUG] Getting ICB parameters...\n"); fflush(stdout);
   Q    = ICB->Get_numCW();
+  printf("# [DEBUG] Q = %d\n", Q); fflush(stdout);
   Nu   = ICB->Get_Nu();
+  printf("# [DEBUG] Nu = %d\n", Nu); fflush(stdout);
   Nb   = N*Nu;
+  printf("# [DEBUG] Nb = %d\n", Nb); fflush(stdout);
   printf("# Q=%d N=%d Nu=%d Nb=%d DNA_Channel [%d]\n",Q,N,Nu,Nb,seed);
   printf("# ICB:   %s\n",fncb);
   printf("# Const: %s\n",fnconst);
@@ -222,8 +233,11 @@ int main(int argc, char *argv[]){
   class ChannelMatrix *ECM = new class ChannelMatrix(fncm);
   // IDSchannel for DNA channel - no IDS parameters needed
   class IDSchannel    *CH  = new class IDSchannel(Nb);
+  printf("# [DEBUG] About to create SLFBAdec decoder\n"); fflush(stdout);
   class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
+  printf("# [DEBUG] SLFBAdec decoder created successfully\n"); fflush(stdout);
   class ChannelMatrix *DCM = new class ChannelMatrix(Q,(int)pow(Q,OutListSize));
+  printf("# [DEBUG] ChannelMatrix DCM created\n"); fflush(stdout);
   int        *dbgDR = new int [Nb+1];                         // (dbg)drift vector
   int           *IW = new int [N];                            // information word
   unsigned char *CW = new unsigned char [Nb];                 // codeword
@@ -235,17 +249,19 @@ int main(int argc, char *argv[]){
   int wc;
   long ec,ecmax=0,es=0;
   
-  // Initialize DNA channel server
-  g_dna_server = new DNAChannelServer();
-  if(!g_dna_server->initialize()) {
-    fprintf(stderr, "Error: Failed to initialize DNA channel server\n");
-    fprintf(stderr, "Using fallback mode (copy original data)\n");
-  }
+  // Initialize DNA channel server (temporarily disabled for debugging)
+  printf("# [DEBUG] Skipping DNA channel server initialization\n"); fflush(stdout);
+  g_dna_server = nullptr;  // Disable DNA server for now
+  printf("# [DEBUG] DNA channel server initialization skipped\n"); fflush(stdout);
   
   //-----
+  printf("# [DEBUG] Starting simulation loop (WCmax=%d)\n", WCmax); fflush(stdout);
   for(wc=1;wc<=WCmax;wc++){
+    printf("# [DEBUG] Block %d: Generating random vector\n", wc); fflush(stdout);
     RandVect(IW,N,0,Q-1);
+    printf("# [DEBUG] Block %d: Starting encoding\n", wc); fflush(stdout);
     ICB->Encode(CW,IW,N);
+    printf("# [DEBUG] Block %d: Encoding completed\n", wc); fflush(stdout);
     // Use DNA channel simulation instead of IDS channel
     Nb2 = transmit_dna_channel(RW,CW,Nb,CH);
     DEC->Decode(Pout,RW,Nb2,IW);
@@ -378,74 +394,62 @@ void dbgPrint(const int *IW, const int *DW,
 // DNA channel simulation functions
 //================================================================================
 
-// Convert binary bits to DNA sequence (2 bits per base: 00=A, 01=C, 10=G, 11=T)
+// Convert 4元符号語 directly to DNA sequence (0=A, 1=C, 2=G, 3=T)
 
 /**
- * @brief 符号語ビット列をランダムビットと組み合わせてDNA配列に変換する
- * 各符号語ビット `bits[i]` を上位ビットとし、ランダム生成ビットを
- * 下位ビットとして2ビットペアを生成し、DNA塩基に変換する。
- * (00:A, 01:C, 10:G, 11:T - binary_dna_mapping.txt参照)
- * @param bits 変換する符号語ビット列
+ * @brief 4元符号語配列を直接DNA配列に変換する
+ * 4元符号語を直接DNA塩基にマッピング:
+ * (0:A, 1:C, 2:G, 3:T - binary_dna_mapping.txt参照)
+ * @param symbols 変換する4元符号語配列
  * @param len 配列の長さ
  * @return std::string 変換後のDNA配列
  */
-
-std::string convert_bits_to_dna(const unsigned char* bits, int len) {
+std::string convert_quaternary_to_dna(const unsigned char* symbols, int len) {
     std::string dna = "";
     
-    //乱数生成器
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 1); // 0または1のランダムなビットを生成
-
-    // 修正: 全てのビットを使用し、符号語ビットを上位に配置
     for(int i = 0; i < len; i++) {
-        //　ランダムなビットを生成
-        unsigned char random_bit = dis(gen);
-
-        //符号語ビットを取得
-        unsigned char codeword_bit = bits[i];
-        // 符号語ビットを上位、ランダムビットを下位に配置
-        unsigned char pair = (codeword_bit << 1) | random_bit;
-        switch(pair) {
-            case 0: dna += "A"; break;  // 00
-            case 1: dna += "C"; break;  // 01
-            case 2: dna += "G"; break;  // 10
-            case 3: dna += "T"; break;  // 11
+        switch(symbols[i]) {
+            case 0: dna += "A"; break;  // 0 = A
+            case 1: dna += "C"; break;  // 1 = C  
+            case 2: dna += "G"; break;  // 2 = G
+            case 3: dna += "T"; break;  // 3 = T
+            default:
+                fprintf(stderr, "Error: Invalid quaternary symbol %d\n", symbols[i]);
+                dna += "A"; // デフォルト値
+                break;
         }
     }
     return dna;
 }
 
-// Convert DNA sequence back to binary bits
-// 修正: 上位ビット（符号語ビット）のみを抽出
-int convert_dna_to_bits(const std::string& dna_result, unsigned char* bits, int max_bits) {
-    int bit_len = 0;
-    for(int i = 0; i < dna_result.length() && bit_len < max_bits; i++) {
+// Convert DNA sequence back to 4元符号語
+int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symbols, int max_symbols) {
+    int symbol_len = 0;
+    for(int i = 0; i < dna_result.length() && symbol_len < max_symbols; i++) {
         char base = dna_result[i];
-        unsigned char codeword_bit = 0;
+        unsigned char quaternary_symbol = 0;
         switch(base) {
             case 'A': case 'a':
-                codeword_bit = 0; // 00の上位ビット
+                quaternary_symbol = 0; // A = 0
                 break;
             case 'C': case 'c':
-                codeword_bit = 0; // 01の上位ビット  
+                quaternary_symbol = 1; // C = 1  
                 break;
             case 'G': case 'g':
-                codeword_bit = 1; // 10の上位ビット
+                quaternary_symbol = 2; // G = 2
                 break;
             case 'T': case 't':
-                codeword_bit = 1; // 11の上位ビット
+                quaternary_symbol = 3; // T = 3
                 break;
             default:
                 // Skip unknown characters
                 continue;
         }
-        if(bit_len < max_bits) {
-            bits[bit_len++] = codeword_bit;
+        if(symbol_len < max_symbols) {
+            symbols[symbol_len++] = quaternary_symbol;
         }
     }
-    return bit_len;
+    return symbol_len;
 }
 
 // Main DNA channel transmission function using persistent server
@@ -455,8 +459,8 @@ int transmit_dna_channel(unsigned char* RW, const unsigned char* CW, int Nb, cla
     const int IDS_Dmin = -drift_range;
     const int IDS_Dmax = drift_range;
     
-    // Convert bits to DNA sequence
-    std::string dna_seq = convert_bits_to_dna(CW, Nb);
+    // Convert quaternary symbols to DNA sequence
+    std::string dna_seq = convert_quaternary_to_dna(CW, Nb);
     
     // Validate input
     if(dna_seq.empty()) {
@@ -482,18 +486,18 @@ int transmit_dna_channel(unsigned char* RW, const unsigned char* CW, int Nb, cla
         return Nb;
     }
     
-    // Calculate maximum allowed bits for RW buffer
-    int max_bits = Nb + CH->GetDmax() * 2;  // Conservative estimate
+    // Calculate maximum allowed symbols for RW buffer
+    int max_symbols = Nb + CH->GetDmax() * 2;  // Conservative estimate
     
-    // Convert received DNA back to bits with boundary checking
-    int Nb2 = convert_dna_to_bits(received_dna, RW, max_bits);
+    // Convert received DNA back to 4元符号語 with boundary checking
+    int Nb2 = convert_dna_to_quaternary(received_dna, RW, max_symbols);
     
     // Ensure Nb2 is within expected range for IDS decoder: [Nb+Dmin, Nb+Dmax]
     if(Nb2 < Nb + IDS_Dmin) {
         // Pad with zeros if too short
         int target = Nb + IDS_Dmin;
-        for(int i = Nb2; i < target && i < max_bits; i++) {
-            RW[i] = 0;
+        for(int i = Nb2; i < target && i < max_symbols; i++) {
+            RW[i] = 0;  // 4元符号語でも0でパディング
         }
         Nb2 = target;
     } else if(Nb2 > Nb + IDS_Dmax) {

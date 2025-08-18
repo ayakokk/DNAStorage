@@ -25,7 +25,7 @@ int main(){
     
     // InnerCodebook初期化
     printf("InnerCodebook読み込み中...\n");
-    InnerCodebook *ICB = new InnerCodebook("ICB/ex01/cb.txt", 3, 8, 2);
+    InnerCodebook *ICB = new InnerCodebook("ICB/ex01_ATGC/cb.txt", 3, 8, 2);
     printf("読み込み完了: Nu=%d, Q=%d\n", ICB->Get_Nu(), ICB->Get_numCW());
 
     // ChannelMatrix初期化

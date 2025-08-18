@@ -19,7 +19,7 @@ int main() {
         
         // InnerCodebook初期化
         std::cout << "InnerCodebook読み込み中..." << std::endl;
-        InnerCodebook *ICB = new InnerCodebook("ICB/ex01/cb.txt", 3, 8, 2);
+        InnerCodebook *ICB = new InnerCodebook("ICB/ex01_ATGC/cb.txt", 3, 8, 2);
         std::cout << "読み込み完了: Nu=" << ICB->Get_Nu() << ", Q=" << ICB->Get_numCW() << std::endl;
         
         // ChannelMatrix初期化

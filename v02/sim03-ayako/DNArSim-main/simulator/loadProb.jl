@@ -8,6 +8,7 @@
 #									    #
 #---------------------------------------------------------------------------#
 
+using DelimitedFiles
 
 function readProbFile(path)
 
