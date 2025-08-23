@@ -1,0 +1,9 @@
+class SLFBAdec {
+private:
+  int Ns;           // block length (symbol)
+  int Nu;           // symbol size (bit)
+  int Nb;           // = Ns*Nu (bit)
+  int Q;            // number of inner codewords |C|
+  double Pi,Pd,Ps;  // ins/del/sub probabilities
+public:
+};

@@ -1,0 +1,17 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "func.hpp"
+#include "InnerCodebook.hpp"
+
+#define BSIZE 8192
+#define WCmax 1000000
+
+
+//================================================================================
+int main(int argc, char *argv[]){
+}

@@ -1,0 +1,105 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <time.h>
+#include <assert.h>
+
+#include "func.hpp"
+#include "ChannelMatrix.hpp"
+#include "InnerCodebook.hpp"
+
+#define BSIZE 8192
+#define WCmax 1000000
+
+void WritePx(const char *fn, const double *Px, int Nu2p);
+
+//================================================================================
+int main(int argc, char *argv[]){
+  int Rho;         // run-length
+  int ell,Delta;   // local-balance
+  int N;           // block length (symbols)
+  int Nb;          // block length (bits)
+  int Q, Nu, Nu2p; // ICB
+  int seed;
+  char *fn;
+  char *fncb    = new char [BSIZE];
+  char *fnconst = new char [BSIZE];
+  char *fncm    = new char [BSIZE];
+  if(argc!=4){
+    fprintf(stderr,"Usage: %s <ICB_dir> <N> <seed|-1>\n",argv[0]);
+    return 1;
+  } // if
+  fn    =      argv[1];
+  N     = atoi(argv[2]);
+  seed  = atoi(argv[3]);
+  if(seed==-1) seed = (int)time(NULL);
+  srandom(seed);
+  sprintf(fncb,   "%s/cb.txt",        fn);  // inner codebook (in)
+  sprintf(fnconst,"%s/constraint.txt",fn);  // constraints (in)
+  sprintf(fncm,   "%s/EncCM.bin",     fn);  // encoding channel matrix (out)
+  ReadConstraints(fnconst, &Rho, &ell, &Delta);
+  class InnerCodebook *ICB = new class InnerCodebook(fncb,Rho,ell,Delta);
+  Q    = ICB->Get_numCW();
+  Nu   = ICB->Get_Nu();
+  Nu2p = ICB->Get_Nu2p();
+  Nb   = N*Nu;
+  printf("# Q=%d Nu=%d(%d) Nb=%d [%d]\n",Q,Nu,Nu2p,Nb,seed);
+  printf("# Input ICB:   %s\n",fncb);
+  printf("# Constraints: %s\n",fnconst);
+  printf("# Output CM:   %s\n",fncm);
+  class ChannelMatrix *CM0 = new class ChannelMatrix(Q,Q);
+  int *IV = new int [N];                       // information word
+  unsigned char *CV = new unsigned char [Nb];  // codeword
+  //double *Px = new double [Nu2p];              // channel prior
+  int wc;
+  //-----
+  for(wc=1;wc<=WCmax;wc++){
+    RandVect(IV,N,0,Q-1);
+    ICB->Encode(CV,IV,N);
+    // count
+    for(int i=0;i<N;i++){
+      if(i*Nu>=ell) CM0->countup( IV[i], ICB->CWindex(&CV[i*Nu]) );
+    } // for i
+    // print
+    if(wc%100000==0 || wc==WCmax-1){
+      printf("wc=%07d H(D)=%e H(D|X)=%e I(D;X)=%e\n",wc,CM0->Hx(),CM0->Hxy(),CM0->Ixy());
+    }
+    //(dbg)
+    //printf("wc=%d\n",wc);
+    //CM0->PrintCnt();
+    //PrintVectX(IV,N, "IV\n","\n");
+    //PrintVectB(CV,Nb,"CV\n","\n");
+  } // for wc
+  //-----
+  CM0->WritePxy(fncm);
+  
+  //CM0->PrintCnt();
+  CM0->PrintPxy();
+  //printf("H(D)=%e H(D|X)=%e I(D;X)=%e\n",CM0->Hx(),CM0->Hxy(),CM0->Ixy());
+  //CM0->GetPy(Px);
+  //WritePx(fnPx,Px,Nu2p);
+  
+  delete ICB;
+  delete CM0;
+  delete [] IV;
+  delete [] CV;
+  delete [] fncb;
+  delete [] fnconst;
+  delete [] fncm;
+  return 0;
+}
+
+//================================================================================
+void WritePx(const char *fn, const double *Px, int Nu2p){
+  FILE *fp;
+  if((fp=fopen(fn,"w"))==NULL){
+    fprintf(stderr,"Cannot open %s\n",fn);
+    exit(1);
+  } // if
+  fprintf(fp,"%d\n",Nu2p);
+  for(int i=0;i<Nu2p;i++){
+    if(Px[i]>0) fprintf(fp,"%d %e\n",i,Px[i]);
+  } // for i
+  fclose(fp);
+}
