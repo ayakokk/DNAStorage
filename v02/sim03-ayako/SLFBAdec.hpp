@@ -53,13 +53,11 @@ private:
   double GetGX(int Nu2, long y, long xi);
   void SetGXNew();
   void DelGXNew();
-  double CalcPyxNew(long y, long x, int ly, int lx, int error_state);  // P(y|x,e)
   // 格子計算ヘルパー関数
   void initializeLattice(std::vector<std::vector<std::vector<double>>>& F, int lx, int ly);
   void calculateLatticeDP(std::vector<std::vector<std::vector<double>>>& F, 
                          const unsigned char* X, const unsigned char* Y, int lx, int ly);
   double getTransitionProbability(int prev_state, int curr_state);
-  double GetGXNew(int Nu2, long y, long xi, int error_state);
   void SetGENew();
   void SetGENewMinimal();     // 最小限のテーブル初期化
   void ExpandGENew(int ly);   // 必要な ly のみ拡張
@@ -116,4 +114,7 @@ public:
   void SaveGENewToFile(int ly, const char* filename);    // バイナリファイル保存
   bool LoadGENewFromFile(int ly, const char* filename);  // バイナリファイル読み込み
   bool LoadAllPrecomputedGENew(const char* precomputed_dir);  // 事前計算済みデータ一括読み込み
+  // GXNew統合デコーディング用公開メソッド
+  double CalcPyxNew(long y, long x, int ly, int lx, int error_state);  // P(y|x,e)
+  double GetGXNew(int Nu2, long y, long xi, int error_state);
 };
