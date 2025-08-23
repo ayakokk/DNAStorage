@@ -45,9 +45,9 @@ long InnerCodebook::VectToLong(const unsigned char *V, int len){
   assert(len>0);
   long val = 0;
   for(int i=0;i<len;i++){
-    assert(V[i]>=0 && V[i]<=3);
-    val <<= 2;  // 4進数なので2ビットシフト
-    val |= (V[i] & 0x3);
+    assert(V[i]==0 || V[i]==1);
+    val <<= 1;
+    if(V[i]==1) val |= 0x1;
   } // for i
   return val;
 }
@@ -202,7 +202,7 @@ void InnerCodebook::ReadFile(const char *fn){
     assert(fgets(buf,BSIZE,fp)!=NULL);
     for(int j=0;j<Nu;j++){
       CW[i][j] = buf[j]-'0';
-      assert(CW[i][j]>=0 && CW[i][j]<=3);
+      assert(CW[i][j]==0 || CW[i][j]==1);
     } // for j
     RLmax[i]   = MaxRunLen(CW[i],   Nu);
     RLleft[i]  = RunLenF(CW[i],0,   Nu);
