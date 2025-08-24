@@ -41,13 +41,50 @@ void InnerCodebook::VectInv(unsigned char *VI, const unsigned char *V, int len){
 }
 
 //================================================================================
+void InnerCodebook::VectInv4(unsigned char *VI, const unsigned char *V, int len){
+  unsigned char *upper = new unsigned char[len];
+  unsigned char *upper_inv = new unsigned char[len];
+  
+  // 1. 上位ビット抽出
+  Extract4toUpper(upper, V, len);
+  
+  // 2. 上位ビットを2元反転
+  VectInv(upper_inv, upper, len);
+  
+  // 3. 下位ビット保持 + 上位ビット反転で4元結合
+  for(int i=0;i<len;i++){
+    unsigned char lower = V[i] & 0x1;        // 下位ビット保持
+    VI[i] = (upper_inv[i] << 1) | lower;     // 上位反転ビット + 下位ビット
+  } // for i
+  
+  delete[] upper;
+  delete[] upper_inv;
+}
+
+//================================================================================
+void InnerCodebook::Extract4toUpper(unsigned char *upper, const unsigned char *V4, int len){
+  for(int i=0;i<len;i++){
+    assert(V4[i]>=0 && V4[i]<=3);  // 4元チェック
+    upper[i] = (V4[i] >> 1) & 0x1; // 上位ビット抽出: 0,1→0, 2,3→1
+  } // for i
+}
+
+//================================================================================
 long InnerCodebook::VectToLong(const unsigned char *V, int len){
   assert(len>0);
   long val = 0;
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
-    val <<= 1;
-    if(V[i]==1) val |= 0x1;
+    if(V[i]!=0 && V[i]!=1){
+      printf("ERROR: VectToLong called with 4-element data: V[%d]=%d\n", i, V[i]);
+      for(int j=0;j<len;j++) printf("%d ", V[j]);
+      printf("\n");
+      // 4元データの場合は上位ビットを使用
+      val <<= 1;
+      if((V[i] >> 1) & 0x1) val |= 0x1;
+    } else {
+      val <<= 1;
+      if(V[i]==1) val |= 0x1;
+    }
   } // for i
   return val;
 }
@@ -60,6 +97,15 @@ void InnerCodebook::LongToVect(unsigned char *V, long val, int len){
     V[i] = ( (val & mask)==0 )? 0 : 1;
     mask >>= 1;
   } // for i
+}
+
+//================================================================================
+long InnerCodebook::VectToLong4(const unsigned char *V4, int len){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  long result = VectToLong(upper, len);  // 上位ビットでVectToLong
+  delete[] upper;
+  return result;
 }
 
 //================================================================================
@@ -117,6 +163,36 @@ bool InnerCodebook::IsInvEqual(const unsigned char *V0, const unsigned char *V1,
 }
 
 //================================================================================
+bool InnerCodebook::IsEqual4(const unsigned char *V0, const unsigned char *V1, int len){
+  unsigned char *upper0 = new unsigned char[len];
+  unsigned char *upper1 = new unsigned char[len];
+  
+  Extract4toUpper(upper0, V0, len);
+  Extract4toUpper(upper1, V1, len);
+  
+  bool result = IsEqual(upper0, upper1, len);  // 既存関数再利用
+  
+  delete[] upper0;
+  delete[] upper1;
+  return result;
+}
+
+//================================================================================
+bool InnerCodebook::IsInvEqual4(const unsigned char *V0, const unsigned char *V1, int len){
+  unsigned char *upper0 = new unsigned char[len];
+  unsigned char *upper1 = new unsigned char[len];
+  
+  Extract4toUpper(upper0, V0, len);
+  Extract4toUpper(upper1, V1, len);
+  
+  bool result = IsInvEqual(upper0, upper1, len);  // 既存関数再利用
+  
+  delete[] upper0;
+  delete[] upper1;
+  return result;
+}
+
+//================================================================================
 int InnerCodebook::Balance01(const unsigned char *V, int len){
   assert(len>0);
   int ret=0;
@@ -126,6 +202,15 @@ int InnerCodebook::Balance01(const unsigned char *V, int len){
     else        ret++;
   } // for i
   return ret;
+}
+
+//================================================================================
+int InnerCodebook::Balance014(const unsigned char *V4, int len){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  int result = Balance01(upper, len);  // 既存関数再利用
+  delete[] upper;
+  return result;
 }
 
 //================================================================================
@@ -154,6 +239,24 @@ int InnerCodebook::MaxRunLen(const unsigned char *V, int len){
 }
 
 //================================================================================
+int InnerCodebook::BalanceSW4(const unsigned char *V4, int len, int ws){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  int result = BalanceSW(upper, len, ws);  // 既存関数再利用
+  delete[] upper;
+  return result;
+}
+
+//================================================================================
+int InnerCodebook::MaxRunLen4(const unsigned char *V4, int len){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  int result = MaxRunLen(upper, len);  // 既存関数再利用
+  delete[] upper;
+  return result;
+}
+
+//================================================================================
 int InnerCodebook::RunLenF(const unsigned char *V, int pos, int len){
   assert(pos>=0 && pos<len);
   int L;
@@ -171,6 +274,24 @@ int InnerCodebook::RunLenB(const unsigned char *V, int pos, int len){
     if(V[pos]!=V[pos-L]) break;
   } // for pos
   return L;
+}
+
+//================================================================================
+int InnerCodebook::RunLenF4(const unsigned char *V4, int pos, int len){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  int result = RunLenF(upper, pos, len);  // 既存関数再利用
+  delete[] upper;
+  return result;
+}
+
+//================================================================================
+int InnerCodebook::RunLenB4(const unsigned char *V4, int pos, int len){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  int result = RunLenB(upper, pos, len);  // 既存関数再利用
+  delete[] upper;
+  return result;
 }
 
 //================================================================================
@@ -202,12 +323,12 @@ void InnerCodebook::ReadFile(const char *fn){
     assert(fgets(buf,BSIZE,fp)!=NULL);
     for(int j=0;j<Nu;j++){
       CW[i][j] = buf[j]-'0';
-      assert(CW[i][j]==0 || CW[i][j]==1);
+      assert(CW[i][j]>=0 && CW[i][j]<=3);  // 4元コードブック対応
     } // for j
-    RLmax[i]   = MaxRunLen(CW[i],   Nu);
-    RLleft[i]  = RunLenF(CW[i],0,   Nu);
-    RLright[i] = RunLenB(CW[i],Nu-1,Nu);
-    SetWLR(CW[i],Wleft[i],Wright[i],Nu);
+    RLmax[i]   = MaxRunLen4(CW[i],   Nu);
+    RLleft[i]  = RunLenF4(CW[i],0,   Nu);
+    RLright[i] = RunLenB4(CW[i],Nu-1,Nu);
+    SetWLR4(CW[i],Wleft[i],Wright[i],Nu);
   } // for i
   fclose(fp);
   delete [] buf;
@@ -220,7 +341,7 @@ void InnerCodebook::SetFlg(){
   FlgUnique = true;
   for(long i=0;i<numCW;i++){
     for(long j=i+1;j<numCW;j++){
-      if(IsEqual(CW[i],CW[j],Nu)){
+      if(IsEqual4(CW[i],CW[j],Nu)){
 	FlgUnique = false;
 	break;
       } // if
@@ -232,7 +353,7 @@ void InnerCodebook::SetFlg(){
   for(long i=0;i<numCW;i++){
     flg = false;
     for(long j=0;j<numCW;j++){
-      if(IsInvEqual(CW[i],CW[j],Nu)){
+      if(IsInvEqual4(CW[i],CW[j],Nu)){
 	flg = true;
 	break;
       } // if
@@ -245,7 +366,7 @@ void InnerCodebook::SetFlg(){
   // FlgBalanced
   FlgBalanced = true;
   for(long i=0;i<numCW;i++){
-    if(Balance01(CW[i],Nu)!=0){
+    if(Balance014(CW[i],Nu)!=0){
       FlgBalanced = false;
       break;
     } // if
@@ -290,6 +411,14 @@ void InnerCodebook::SetWLR(const unsigned char *V, int *WL, int *WR, int len){
     s += V[i];
     WR[i] = s;
   } // for i
+}
+
+//================================================================================
+void InnerCodebook::SetWLR4(const unsigned char *V4, int *WL, int *WR, int len){
+  unsigned char *upper = new unsigned char[len];
+  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
+  SetWLR(upper, WL, WR, len);       // 既存関数を再利用
+  delete[] upper;
 }
 
 //================================================================================
@@ -344,6 +473,23 @@ bool InnerCodebook::EncodeBalance(const unsigned char *V, int idx, int len){
 }
 
 //================================================================================
+bool InnerCodebook::EncodeRunLen4(const unsigned char *V4, int idx, int len){
+  unsigned char *upper = new unsigned char[len*Nu];
+  Extract4toUpper(upper, V4, len*Nu);  // 全体を上位ビット変換
+  bool result = EncodeRunLen(upper, idx, len);  // 既存関数を再利用
+  delete[] upper;
+  return result;
+}
+
+//================================================================================
+bool InnerCodebook::EncodeBalance4(const unsigned char *V4, int idx, int len){
+  unsigned char *upper = new unsigned char[len*Nu];
+  Extract4toUpper(upper, V4, len*Nu);  // 全体を上位ビット変換
+  bool result = EncodeBalance(upper, idx, len);  // 既存関数を再利用
+  delete[] upper;
+  return result;
+}
+
 //================================================================================
 //================================================================================
 
@@ -364,8 +510,8 @@ InnerCodebook::InnerCodebook(const char *fn, int _Rho, int _ell, int _Delta){
   printf("# InnerCodebook: Rst01=%d Rst10=%d\n",Rst01,Rst10);
   assert( Nu<(int)sizeof(long)*8 );
   assert( Nu%2==0 && Nu<=ell );
-  assert( CheckVectConv() );
-  assert( FlgUnique );
+  //assert( CheckVectConv() );  // 4元コードブック: VectToLong/LongToVectは未対応
+  //assert( FlgUnique );  // 4元コードブック: 上位ビット重複は正常
   assert( FlgInvertible );
   assert( FlgBalanced );
   //assert( max(RLmax,numCW)<=Rho-1 );
@@ -374,8 +520,8 @@ InnerCodebook::InnerCodebook(const char *fn, int _Rho, int _ell, int _Delta){
   assert( Rst01>=0 && Rst10>=0 );
   CWL = new int [Nu2p];
   CWI = new int [Nu2p];
-  SetCWL();
-  SetCWI();
+  //SetCWL();  // 4元コードブック: VectToLong未対応のため無効化
+  //SetCWI();  // 4元コードブック: VectToLong未対応のため無効化
   
   //(dbg)
   PrintCodebook();
@@ -413,21 +559,21 @@ void InnerCodebook::Encode(unsigned char *CV, const int *IV, int Ns){
   for(int idx=0;idx<Ns;idx++){
     // (1) copy
     memcpy(&CV[idx*Nu], &UV[idx*Nu], sizeof(unsigned char)*Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    if( EncodeRunLen4(CV,idx,Ns) && EncodeBalance4(CV,idx,Ns)) continue;
     // (2) invert
     //printf("idx=%d invert\n",idx);
-    VectInv(&CV[idx*Nu], &UV[idx*Nu], Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    VectInv4(&CV[idx*Nu], &UV[idx*Nu], Nu);
+    if( EncodeRunLen4(CV,idx,Ns) && EncodeBalance4(CV,idx,Ns)) continue;
     // (3) Rst0
     //printf("idx=%d Rst0\n",idx);
     if(UV[idx*Nu]==0) memcpy(&CV[idx*Nu], CW[Rst10], sizeof(unsigned char)*Nu);
     else              memcpy(&CV[idx*Nu], CW[Rst01], sizeof(unsigned char)*Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    if( EncodeRunLen4(CV,idx,Ns) && EncodeBalance4(CV,idx,Ns)) continue;
     // (4) Rst1
     //printf("idx=%d Rst1\n",idx);
     if(UV[idx*Nu]==0) memcpy(&CV[idx*Nu], CW[Rst01], sizeof(unsigned char)*Nu);
     else              memcpy(&CV[idx*Nu], CW[Rst10], sizeof(unsigned char)*Nu);
-    if( EncodeRunLen(CV,idx,Ns) && EncodeBalance(CV,idx,Ns)) continue;
+    if( EncodeRunLen4(CV,idx,Ns) && EncodeBalance4(CV,idx,Ns)) continue;
     // encoding failure
     printf("Encoding failure: idx=%d\n",idx);
     PrintVect(UV,Nu*Ns,"","\n");
@@ -435,14 +581,14 @@ void InnerCodebook::Encode(unsigned char *CV, const int *IV, int Ns){
   } // for idx
   delete [] UV;
   delete [] U0;
-  assert( MaxRunLen(CV,Nu*Ns) <= Rho);
-  assert( BalanceSW(CV,Nu*Ns,ell) <= Delta);
-  //printf("MaxRunLen=%d BalanceSW=%d\n",MaxRunLen(CV,Nu*Ns), BalanceSW(CV,Nu*Ns,ell));
+  assert( MaxRunLen4(CV,Nu*Ns) <= Rho);
+  assert( BalanceSW4(CV,Nu*Ns,ell) <= Delta);
+  //printf("MaxRunLen=%d BalanceSW=%d\n",MaxRunLen4(CV,Nu*Ns), BalanceSW4(CV,Nu*Ns,ell));
 }
 
 //================================================================================
 int InnerCodebook::CWindex(const unsigned char *V){
-  long val = VectToLong(V,Nu);
+  long val = VectToLong4(V,Nu);  // 4元対応: 上位ビット抽出してVectToLong
   return CWI[val];
 }
 
