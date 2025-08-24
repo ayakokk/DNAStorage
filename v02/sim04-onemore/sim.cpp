@@ -4,6 +4,11 @@
 #include <math.h>
 #include <time.h>
 #include <assert.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <string>
+#include <random>
 
 #include "func.hpp"
 #include "ChannelMatrix.hpp"
@@ -11,15 +16,167 @@
 #include "IDSchannel.hpp"
 #include "SLFBAdec.hpp"
 
+// DNA channel simulation functions for 4-ary codewords
+std::string convert_quaternary_to_dna(const unsigned char* symbols, int len);
+int transmit_dna_channel(unsigned char* RW, const unsigned char* CW, int Nb, class IDSchannel* CH);
+int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symbols, int max_symbols);
+
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 100000
+#define WCmax 10
 
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
 void dbgPrint(const int *IW, const int *DW, 
 	      const unsigned char *CW, const unsigned char *RW, const double **Pout, 
 	      const int *dbgDR, int Nb, int Nb2, int Nu, int Q);
+
+// DNA Channel Server class for persistent Julia communication
+class DNAChannelServer {
+private:
+    int pipe_in[2];   // pipe for sending to Julia
+    int pipe_out[2];  // pipe for receiving from Julia
+    pid_t julia_pid;
+    FILE* write_fp;
+    FILE* read_fp;
+    bool is_ready;
+
+public:
+    DNAChannelServer() : julia_pid(-1), write_fp(nullptr), read_fp(nullptr), is_ready(false) {
+        pipe_in[0] = pipe_in[1] = -1;
+        pipe_out[0] = pipe_out[1] = -1;
+    }
+    
+    ~DNAChannelServer() {
+        shutdown();
+    }
+    
+    bool initialize() {
+        // Create pipes
+        if(pipe(pipe_in) == -1 || pipe(pipe_out) == -1) {
+            fprintf(stderr, "Error: Failed to create pipes\n");
+            return false;
+        }
+        
+        // Fork Julia process
+        julia_pid = fork();
+        if(julia_pid == -1) {
+            fprintf(stderr, "Error: Failed to fork Julia process\n");
+            return false;
+        }
+        
+        if(julia_pid == 0) {
+            // Child process: run Julia server
+            close(pipe_in[1]);   // Close write end of input pipe
+            close(pipe_out[0]);  // Close read end of output pipe
+            
+            // Redirect stdin/stdout to pipes
+            dup2(pipe_in[0], STDIN_FILENO);
+            dup2(pipe_out[1], STDOUT_FILENO);
+            
+            // Execute Julia server
+            execlp("julia", "julia", 
+                   "DNArSim-main/simulator/dna_server.jl",
+                   (char*)NULL);
+            
+            // If we reach here, exec failed
+            fprintf(stderr, "Error: Failed to execute Julia server\n");
+            exit(1);
+        } else {
+            // Parent process: setup communication
+            close(pipe_in[0]);   // Close read end of input pipe
+            close(pipe_out[1]);  // Close write end of output pipe
+            
+            // Create file streams for easier I/O
+            write_fp = fdopen(pipe_in[1], "w");
+            read_fp = fdopen(pipe_out[0], "r");
+            
+            if(!write_fp || !read_fp) {
+                fprintf(stderr, "Error: Failed to create file streams\n");
+                return false;
+            }
+            
+            // Wait for Julia server to signal readiness
+            char response[256];
+            if(fgets(response, sizeof(response), read_fp)) {
+                if(strstr(response, "DNA_SERVER_READY")) {
+                    is_ready = true;
+                    printf("# [INFO] DNA channel server initialized successfully\n");
+                    return true;
+                }
+            }
+            
+            fprintf(stderr, "Error: DNA server failed to initialize\n");
+            return false;
+        }
+        return false;
+    }
+    
+    std::string transmit(const std::string& dna_sequence) {
+        if(!is_ready || !write_fp || !read_fp) {
+            fprintf(stderr, "Error: DNA server not ready\n");
+            return "";
+        }
+        
+        // Send DNA sequence to Julia server
+        fprintf(write_fp, "%s\n", dna_sequence.c_str());
+        fflush(write_fp);
+        
+        // Read response
+        char buffer[8192];
+        if(fgets(buffer, sizeof(buffer), read_fp)) {
+            // Remove newline
+            std::string result(buffer);
+            if(!result.empty() && result.back() == '\n') {
+                result.pop_back();
+            }
+            
+            // Check if it's an error message
+            if(result.find("ERROR:") == 0) {
+                fprintf(stderr, "Julia server error: %s\n", result.c_str());
+                return "";
+            }
+            
+            // Check if it's a RESULT: response
+            if(result.find("RESULT:") == 0) {
+                return result.substr(7); // Remove "RESULT:" prefix
+            }
+            
+            // Otherwise return as-is
+            return result;
+        }
+        
+        return "";
+    }
+    
+    void shutdown() {
+        if(write_fp) {
+            fprintf(write_fp, "EXIT\n");
+            fflush(write_fp);
+            fclose(write_fp);
+            write_fp = nullptr;
+        }
+        
+        if(read_fp) {
+            fclose(read_fp);
+            read_fp = nullptr;
+        }
+        
+        if(julia_pid != -1) {
+            // Wait for Julia process to terminate
+            int status;
+            waitpid(julia_pid, &status, 0);
+            julia_pid = -1;
+        }
+        
+        is_ready = false;
+    }
+    
+    bool isReady() const { return is_ready; }
+};
+
+// Global DNA server instance
+DNAChannelServer* g_dna_server = nullptr;
 
 //================================================================================
 int main(int argc, char *argv[]){
@@ -58,24 +215,35 @@ int main(int argc, char *argv[]){
   Q    = ICB->Get_numCW();
   Nu   = ICB->Get_Nu();
   Nb   = N*Nu;
-  printf("# Q=%d N=%d Nu=%d Nb=%d (Pi,Pd,Ps)=(%e,%e,%e) [%d]\n",Q,N,Nu,Nb,Pi,Pd,Ps,seed);
+  printf("# Q=%d N=%d Nu=%d Nb=%d DNA_Channel [%d]\n",Q,N,Nu,Nb,seed);
   printf("# ICB:   %s\n",fncb);
   printf("# Const: %s\n",fnconst);
   printf("# EncCM: %s\n",fncm);
+  
+  // Initialize DNA channel server
+  g_dna_server = new DNAChannelServer();
+  if(!g_dna_server->initialize()){
+    fprintf(stderr, "Error: Failed to initialize DNA channel server\n");
+    delete g_dna_server;
+    return 1;
+  }
+  
   class ChannelMatrix *ECM = new class ChannelMatrix(fncm);
   class IDSchannel    *CH  = new class IDSchannel(Nb,Pi,Pd,Ps);
-  class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
-  class ChannelMatrix *DCM = new class ChannelMatrix(Q,(int)pow(Q,OutListSize));
+  // Skip decoder initialization for DNA communication test
+  // class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
+  // class ChannelMatrix *DCM = new class ChannelMatrix(Q,(int)pow(Q,OutListSize));
   int        *dbgDR = new int [Nb+1];                         // (dbg)drift vector
   int           *IW = new int [N];                            // information word
   unsigned char *CW = new unsigned char [Nb];                 // codeword
   unsigned char *RW = new unsigned char [Nb + CH->GetDmax()]; // received word
-  int           *DW = new int [N];                            // decoded word
-  long         *DWL = new long [N];                           // (Pout->list->long)
-  double **Pout = new double * [N];
-  for(int i=0;i<N;i++) Pout[i] = new double [Q];
+  // Skip decoder-related variables for DNA communication test
+  // int           *DW = new int [N];                            // decoded word
+  // long         *DWL = new long [N];                           // (Pout->list->long)
+  // double **Pout = new double * [N];
+  // for(int i=0;i<N;i++) Pout[i] = new double [Q];
   int wc;
-  long ec,ecmax=0,es=0;
+  // long ec,ecmax=0,es=0;
   
   //-----
   for(wc=1;wc<=WCmax;wc++){
@@ -83,19 +251,35 @@ int main(int argc, char *argv[]){
     // IWを不均一にすれば
     RandVect(IW,N,0,Q-1);
     ICB->Encode(CW,IW,N);
-    Nb2 = CH->transmit(RW,CW);
-    DEC->Decode(Pout,RW,Nb2,IW);
-    HardDecision(DW,(const double **)Pout,N,Q);
-    OutputConv(DWL,(const double **)Pout,N,Q);
-    for(int i=0;i<N;i++) DCM->countup(IW[i],DWL[i]);
-    ec = HammingDist(IW,DW,N);
-    es += ec;
-    ecmax = max(ec,ecmax);
+    Nb2 = transmit_dna_channel(RW,CW,Nb,CH);  // Use DNA channel transmission
+    if(Nb2 < 0){
+      fprintf(stderr, "Error: DNA transmission failed at word %d\n", wc);
+      break;
+    }
+    
+    // Print original and received codewords for comparison
+    printf("# [COMPARISON] Original CW: ");
+    for(int i = 0; i < Nb; i++) printf("%d", CW[i]);
+    printf("\n# [COMPARISON] Received RW: ");
+    for(int i = 0; i < Nb2; i++) printf("%d", RW[i]);
+    printf("\n# [COMPARISON] Length change: %d -> %d\n", Nb, Nb2);
+    
+    // Skip decoder for now - just test Julia communication
+    printf("# [INFO] Julia DNA channel communication test completed successfully\n");
+    // break;  // Exit after first transmission test
+    
+    // DEC->Decode(Pout,RW,Nb2,IW);
+    // HardDecision(DW,(const double **)Pout,N,Q);
+    // OutputConv(DWL,(const double **)Pout,N,Q);
+    // for(int i=0;i<N;i++) DCM->countup(IW[i],DWL[i]);
+    // ec = HammingDist(IW,DW,N);
+    // es += ec;
+    // ecmax = max(ec,ecmax);
 
-    if(wc%1000==0 || wc==WCmax){
-      printf("%04d %ld/%ld %ld %e : %e %e %e\n",
-	     wc,es,(long)wc*N,ecmax,(double)es/(wc*N), DCM->Hx(), DCM->Hxy(), DCM->Ixy());
-    } // if wc 
+    // if(wc%1000==0 || wc==WCmax){
+    //   printf("%04d %ld/%ld %ld %e : %e %e %e\n",
+    //	     wc,es,(long)wc*N,ecmax,(double)es/(wc*N), DCM->Hx(), DCM->Hxy(), DCM->Ixy());
+    // } // if wc 
 
     //(dbg)
     //CH->GetDR(dbgDR);
@@ -105,23 +289,99 @@ int main(int argc, char *argv[]){
   //-----
   //DCM->PrintCnt();
 
+  // Shutdown DNA server
+  if(g_dna_server){
+    delete g_dna_server;
+    g_dna_server = nullptr;
+  }
+
   delete ICB;
   delete ECM;
   delete CH;
-  delete DEC;
-  delete DCM;
+  // delete DEC;
+  // delete DCM;
   delete [] dbgDR;
   delete [] IW;
   delete [] CW;
   delete [] RW;
-  delete [] DW;
-  delete [] DWL;
+  // delete [] DW;
+  // delete [] DWL;
   delete [] fncb;
   delete [] fnconst;
   delete [] fncm;
-  for(int i=0;i<N;i++) delete [] Pout[i];
-  delete [] Pout;
+  // for(int i=0;i<N;i++) delete [] Pout[i];
+  // delete [] Pout;
   return 0;
+}
+
+//================================================================================
+// DNA conversion functions for 4-ary codewords
+std::string convert_quaternary_to_dna(const unsigned char* symbols, int len){
+  std::string dna_sequence;
+  dna_sequence.reserve(len);
+  
+  for(int i = 0; i < len; i++){
+    assert(symbols[i] >= 0 && symbols[i] <= 3);
+    switch(symbols[i]){
+      case 0: dna_sequence += 'A'; break;  // 0 -> A
+      case 1: dna_sequence += 'C'; break;  // 1 -> C  
+      case 2: dna_sequence += 'G'; break;  // 2 -> G
+      case 3: dna_sequence += 'T'; break;  // 3 -> T
+      default: assert(false);
+    }
+  }
+  return dna_sequence;
+}
+
+int transmit_dna_channel(unsigned char* RW, const unsigned char* CW, int Nb, class IDSchannel* CH){
+  if(!g_dna_server || !g_dna_server->isReady()){
+    fprintf(stderr, "Error: DNA server not initialized\n");
+    return -1;
+  }
+  
+  // Convert 4-ary codeword to DNA sequence
+  std::string dna_input = convert_quaternary_to_dna(CW, Nb);
+  printf("# [DEBUG] Sending DNA sequence: %s\n", dna_input.c_str());
+  
+  // Transmit through Julia DNA channel  
+  std::string dna_result = g_dna_server->transmit(dna_input);
+  
+  if(dna_result.empty()){
+    fprintf(stderr, "Error: DNA transmission failed\n");
+    return -1;
+  }
+  
+  printf("# [DEBUG] Received DNA result: %s\n", dna_result.c_str());
+  
+  // Convert DNA result back to 4-ary symbols
+  int result_length = convert_dna_to_quaternary(dna_result, RW, Nb + CH->GetDmax());
+  
+  printf("# [DEBUG] Converted to %d quaternary symbols\n", result_length);
+  
+  return result_length;
+}
+
+int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symbols, int max_symbols){
+  int len = dna_result.length();
+  if(len > max_symbols){
+    len = max_symbols;
+  }
+  
+  for(int i = 0; i < len; i++){
+    char nucleotide = dna_result[i];
+    switch(nucleotide){
+      case 'A': symbols[i] = 0; break;  // A -> 0
+      case 'C': symbols[i] = 1; break;  // C -> 1
+      case 'G': symbols[i] = 2; break;  // G -> 2
+      case 'T': symbols[i] = 3; break;  // T -> 3
+      default: 
+        fprintf(stderr, "Warning: Invalid nucleotide '%c' at position %d, using A\n", nucleotide, i);
+        symbols[i] = 0; // Default to A
+        break;
+    }
+  }
+  
+  return len;
 }
 
 //================================================================================

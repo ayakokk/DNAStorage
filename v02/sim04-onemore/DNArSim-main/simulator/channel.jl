@@ -10,23 +10,10 @@
 
 function channel(nbrSim=0,k=0,seq="")
 
-
-	#check if seq is correct
-	if(length(seq)>1)
-		if(seq[1][1]=='>')
-			seq=seq[2]
-		else	
-			println()
-			println("Error: reference file format incorrect!")
-			exit(1)
-		end
-	end
-
 	if(!occursin(r"^[ACGT]+$", seq))
 		println()
 		println("Error: reference file contains unknown bases")
 		exit(1)
-		
 	end
 
 

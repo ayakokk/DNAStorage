@@ -225,6 +225,17 @@ int InnerCodebook::BalanceSW(const unsigned char *V, int len, int ws){
 }
 
 //================================================================================
+int InnerCodebook::BalanceSW4(const unsigned char *V4, int len, int ws){
+  assert(ws>0 && len>=ws);
+  int b, bmax=0;
+  for(int i=0;i<len-ws+1;i++){
+    b = abs( Balance014(&V4[i],ws) );
+    if(b>bmax) bmax=b;
+  } // for i
+  return bmax;
+}
+
+//================================================================================
 int InnerCodebook::MaxRunLen(const unsigned char *V, int len){
   assert(len>0);
   int L, Lmax=1;
@@ -238,14 +249,6 @@ int InnerCodebook::MaxRunLen(const unsigned char *V, int len){
   return Lmax;
 }
 
-//================================================================================
-int InnerCodebook::BalanceSW4(const unsigned char *V4, int len, int ws){
-  unsigned char *upper = new unsigned char[len];
-  Extract4toUpper(upper, V4, len);  // 4元→上位ビット抽出
-  int result = BalanceSW(upper, len, ws);  // 既存関数再利用
-  delete[] upper;
-  return result;
-}
 
 //================================================================================
 int InnerCodebook::MaxRunLen4(const unsigned char *V4, int len){
