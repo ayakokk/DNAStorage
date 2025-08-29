@@ -489,6 +489,7 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   Nu2min = Nu - (int)ceil( (double)Nu*Pd ) - 2;
   Nu2max = min(Nu2max, Nu*2);
   Nu2min = max(Nu2min, 0   );
+  k_mer_length = 4;  // 初期値としてk=4を設定
   printf("# SLFBAdec: Ns=%d (Nu;Nu2min,Nu2max)=(%d(%ld);%d,%d) Nb=%d Q=%d\n",Ns,Nu,Nu2p,Nu2min,Nu2max,Nb,Q);
   printf("# SLFBAdec: (Pi,Pd,Ps,Pt)=(%e,%e,%e,%e) (Dmin,Dmax:Drng)=(%d,%d:%d)\n",
 	 Pi,Pd,Ps,Pt,Dmin,Dmax,Drng);
@@ -502,6 +503,8 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   SetGX();
   printf("# SLFBAdec: generating factor graph\n");
   SetFG();
+  printf("# SLFBAdec: generating error state extended factor graph\n");
+  SetFGE();
 }
 
 //================================================================================
@@ -509,6 +512,7 @@ SLFBAdec::~SLFBAdec(){
   DelGD();
   DelGX();
   DelFG();
+  DelFGE();
   printf("# SLFBAdec: deleted\n");
 }
 
@@ -516,11 +520,16 @@ SLFBAdec::~SLFBAdec(){
 void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin){
   int idx;
   assert( Nb2>=Nb+Dmin && Nb2<=Nb+Dmax );
-  InitFG(RW,Pin,Nb2);
+  
+  // 段階1a: エラー状態メモリ付き3Dラティスデコーダー
+  printf("# Using 3D lattice decoder with error state memory\n");
+  InitFGE(RW,Pin,Nb2);
   for(idx=0;   idx<Ns;idx++) CalcPU(idx);
-  for(idx=0;   idx<Ns;idx++) CalcPF(idx,Nb2);
-  for(idx=Ns-1;idx>=0;idx--) CalcPB(idx,Nb2);
-  for(idx=0;   idx<Ns;idx++) CalcPD(idx,Nb2);
+  for(idx=0;   idx<Ns;idx++) CalcPFE(idx,Nb2);   // 3D前進確率
+  for(idx=Ns-1;idx>=0;idx--) CalcPBE(idx,Nb2);   // 3D後進確率
+  
+  // 3Dエラー状態拡張版の事後確率計算
+  for(idx=0;   idx<Ns;idx++) CalcPDE(idx,Nb2);   // 3D事後確率
   for(idx=0;   idx<Ns;idx++) CalcPO(idx);
   CopyMat(Pout,(const double**)PO,Ns,Q);
   
@@ -685,5 +694,325 @@ void SLFBAdec::exportAllTables(const char* output_dir) {
   }
   
   printf("# All probability tables exported to: %s\n", output_dir);
+}
+
+//================================================================================
+// エラー状態拡張FGデータ構造の設定
+//================================================================================
+void SLFBAdec::SetFGE(){
+  PFE = new double ** [Ns+1];
+  PBE = new double ** [Ns+1];
+  for(int i=0;i<Ns+1;i++){
+    PFE[i] = new double * [Drng];
+    PBE[i] = new double * [Drng];
+    for(int d=0;d<Drng;d++){
+      PFE[i][d] = new double [NUM_ERROR_STATES];
+      PBE[i][d] = new double [NUM_ERROR_STATES];
+    }
+  }
+  
+  PE = new double ** [Ns];
+  for(int i=0;i<Ns;i++){
+    PE[i] = new double * [NUM_ERROR_STATES];
+    for(int e=0;e<NUM_ERROR_STATES;e++){
+      PE[i][e] = new double [NUM_ERROR_STATES];
+    }
+  }
+  
+  printf("# SLFBAdec: SetFGE completed (3D arrays allocated)\n");
+}
+
+//================================================================================
+// エラー状態拡張FGデータ構造の削除
+//================================================================================
+void SLFBAdec::DelFGE(){
+  for(int i=0;i<Ns+1;i++){
+    for(int d=0;d<Drng;d++){
+      delete [] PFE[i][d];
+      delete [] PBE[i][d];
+    }
+    delete [] PFE[i];
+    delete [] PBE[i];
+  }
+  delete [] PFE;
+  delete [] PBE;
+  
+  for(int i=0;i<Ns;i++){
+    for(int e=0;e<NUM_ERROR_STATES;e++){
+      delete [] PE[i][e];
+    }
+    delete [] PE[i];
+  }
+  delete [] PE;
+  
+  printf("# SLFBAdec: DelFGE completed (3D arrays deallocated)\n");
+}
+
+//================================================================================
+// エラー状態拡張FGの初期化
+//================================================================================
+void SLFBAdec::InitFGE(const unsigned char *RW, const double **Pin, int Nb2){
+  // 既存の初期化を実行
+  InitFG(RW, Pin, Nb2);
+  
+  // エラー状態確率を初期化
+  for(int i=0;i<Ns+1;i++){
+    for(int d=0;d<Drng;d++){
+      for(int e=0;e<NUM_ERROR_STATES;e++){
+        PFE[i][d][e] = 0.0;
+        PBE[i][d][e] = 0.0;
+      }
+    }
+  }
+  
+  // 初期エラー状態: 論文に従いMatch状態で開始 (σ_0 = (0, 0, M))
+  PFE[0][0-Dmin][ERROR_MATCH] = 1.0;
+  PFE[0][0-Dmin][ERROR_INSERTION] = 0.0;
+  PFE[0][0-Dmin][ERROR_DELETION] = 0.0;
+  PFE[0][0-Dmin][ERROR_SUBSTITUTION] = 0.0;
+  
+  // 最終エラー状態も均等分布で初期化
+  PBE[Ns][Nb2-Nb-Dmin][ERROR_MATCH] = 0.25;
+  PBE[Ns][Nb2-Nb-Dmin][ERROR_INSERTION] = 0.25;
+  PBE[Ns][Nb2-Nb-Dmin][ERROR_DELETION] = 0.25;
+  PBE[Ns][Nb2-Nb-Dmin][ERROR_SUBSTITUTION] = 0.25;
+  
+  printf("# SLFBAdec: InitFGE completed\n");
+}
+
+//================================================================================
+// エラー状態遷移確率の計算（P(e_{i+1}|e_i)）
+//================================================================================
+void SLFBAdec::CalcPE(int idx){
+  assert(idx>=0 && idx<Ns);
+  
+  // 段階1a: 単純なエラー状態メモリモデル
+  // 実際の実装では、ここでDNArSim-mainの確率テーブルを使用予定
+  
+  for(int e0=0; e0<NUM_ERROR_STATES; e0++){
+    for(int e1=0; e1<NUM_ERROR_STATES; e1++){
+      if(e0 == e1){
+        // 同一エラー状態に留まる確率（高い）
+        PE[idx][e0][e1] = 0.7;
+      } else {
+        // 他のエラー状態に遷移する確率（低く均等）
+        PE[idx][e0][e1] = 0.1;
+      }
+    }
+  }
+  
+  // 正規化
+  for(int e0=0; e0<NUM_ERROR_STATES; e0++){
+    double sum = 0.0;
+    for(int e1=0; e1<NUM_ERROR_STATES; e1++){
+      sum += PE[idx][e0][e1];
+    }
+    for(int e1=0; e1<NUM_ERROR_STATES; e1++){
+      PE[idx][e0][e1] /= sum;
+    }
+  }
+}
+
+//================================================================================
+// エラー状態を含む前進確率計算（3Dラティス）
+//================================================================================
+void SLFBAdec::CalcPFE(int idx, int Nb2){
+  assert(idx >= 0 && idx < Ns);
+
+  // エラー状態遷移確率を事前計算
+  CalcPE(idx);
+
+  // 次の状態 t+1 の確率を初期化
+  for(int d1 = Dmin; d1 <= Dmax; d1++){
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++){
+      PFE[idx+1][d1-Dmin][e1] = 0.0;
+    }
+  }
+  
+  // 現在の状態 t から 次の状態 t+1 への全ての遷移を計算
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      
+      // もし現在の状態(d0, e0)に至る確率が0なら、このパスからの寄与はない
+      if (PFE[idx][d0-Dmin][e0] == 0.0) continue;
+
+      for (int d1 = Dmin; d1 <= Dmax; d1++) {
+        
+        // --- ここからが分岐メトリック γ_t の計算 ---
+        int Nu2 = Nu + d1 - d0;
+        int iL = idx * Nu + d0;
+        
+        if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+        double *s_per_codeword = new double[Q];
+        // 全ての符号語xiについて、観測確率 P(y|xi,d0,d1) を計算
+        for (int xi = 0; xi < Q; xi++) {
+          if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+            long y = VectToLong(&Yin[iL], Nu2);
+            s_per_codeword[xi] = GetGX(Nu2, y, xi);
+          } else {
+            s_per_codeword[xi] = GetGX(Nu2, 0, 0); // 近似値
+          }
+        }
+
+        // 全ての次のエラー状態e1への遷移を計算
+        for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+          double total_gamma = 0.0;
+          // 全ての符号語xiについて、分岐メトリックを計算し、周辺化(合計)する
+          for (int xi = 0; xi < Q; xi++) {
+            // 論文の3Dラティス計算: P(y|xi) * P(xi) * P(e1|e0)
+            double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * PE[idx][e0][e1];
+            total_gamma += gamma_xi;
+          }
+          
+          // 前進確率の更新
+          PFE[idx+1][d1-Dmin][e1] += PFE[idx][d0-Dmin][e0] * total_gamma;
+        }
+        
+        delete[] s_per_codeword;
+      }
+    }
+  }
+
+  // 正規化
+  double total_sum = 0.0;
+  for(int d1 = Dmin; d1 <= Dmax; d1++){
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++){
+      total_sum += PFE[idx+1][d1-Dmin][e1];
+    }
+  }
+  if(total_sum > 0.0){
+    for(int d1 = Dmin; d1 <= Dmax; d1++){
+      for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++){
+        PFE[idx+1][d1-Dmin][e1] /= total_sum;
+      }
+    }
+  }
+}
+
+//================================================================================
+// エラー状態を含む後進確率計算（3Dラティス）
+//================================================================================
+void SLFBAdec::CalcPBE(int idx, int Nb2){
+  assert(idx >= 0 && idx < Ns);
+
+  // エラー状態遷移確率を事前計算
+  CalcPE(idx);
+  
+  // 現在の状態 t の確率を初期化
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      PBE[idx][d0-Dmin][e0] = 0.0;
+    }
+  }
+  
+  // 次の状態 t+1 から 現在の状態 t への全ての遷移を計算
+  for (int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      
+      if (PBE[idx+1][d1-Dmin][e1] == 0.0) continue;
+
+      for (int d0 = Dmin; d0 <= Dmax; d0++) {
+          
+        // --- 分岐メトリック γ_t の計算 (CalcPFEと同一) ---
+        int Nu2 = Nu + d1 - d0;
+        int iL = idx * Nu + d0;
+        
+        if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+        double *s_per_codeword = new double[Q];
+        for (int xi = 0; xi < Q; xi++) {
+          if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+            long y = VectToLong(&Yin[iL], Nu2);
+            s_per_codeword[xi] = GetGX(Nu2, y, xi);
+          } else {
+            s_per_codeword[xi] = GetGX(Nu2, 0, 0);
+          }
+        }
+        
+        // 全ての前のエラー状態e0からの遷移を計算
+        for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+          double total_gamma = 0.0;
+          for (int xi = 0; xi < Q; xi++) {
+            double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * PE[idx][e0][e1];
+            total_gamma += gamma_xi;
+          }
+          
+          // 後進確率の更新
+          PBE[idx][d0-Dmin][e0] += PBE[idx+1][d1-Dmin][e1] * total_gamma;
+        }
+        
+        delete[] s_per_codeword;
+      }
+    }
+  }
+
+  // 正規化
+  double total_sum = 0.0;
+  for(int d0 = Dmin; d0 <= Dmax; d0++){
+    for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++){
+      total_sum += PBE[idx][d0-Dmin][e0];
+    }
+  }
+  if(total_sum > 0.0){
+    for(int d0 = Dmin; d0 <= Dmax; d0++){
+      for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++){
+        PBE[idx][d0-Dmin][e0] /= total_sum;
+      }
+    }
+  }
+}
+
+//================================================================================
+// エラー状態を含む事後確率計算（3Dラティス）
+//================================================================================
+void SLFBAdec::CalcPDE(int idx, int Nb2){
+  assert(idx >= 0 && idx < Ns);
+  
+  // エラー状態遷移確率を事前計算
+  CalcPE(idx);
+  
+  // 各符号語xiの事後確率を計算
+  for (int xi = 0; xi < Q; xi++) {
+    PD[idx][xi] = 0.0;
+    
+    // 全てのドリフト状態とエラー状態の組み合わせについて周辺化
+    for (int d0 = Dmin; d0 <= Dmax; d0++) {
+      for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+        for (int d1 = Dmin; d1 <= Dmax; d1++) {
+          for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+            
+            // 基本チャネルパラメータ計算
+            int Nu2 = Nu + d1 - d0;
+            int iL = idx * Nu + d0;
+            
+            if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+            
+            // 観測確率 P(y|xi, d0, d1)
+            double obs_prob;
+            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+              long y = VectToLong(&Yin[iL], Nu2);
+              obs_prob = GetGX(Nu2, y, xi);
+            } else {
+              obs_prob = GetGX(Nu2, 0, 0);
+            }
+            
+            // 3D前進・後進確率を使った事後確率計算
+            // P(xi|y,d,e) ∝ α(d0,e0) × [ P(y|xi,d) × P(xi) × P(e1|e0) ] × β(d1,e1)
+            double posterior_contrib = PFE[idx][d0-Dmin][e0] * 
+                                     obs_prob * 
+                                     PU[idx][xi] * 
+                                     PE[idx][e0][e1] * 
+                                     PBE[idx+1][d1-Dmin][e1];
+            
+            PD[idx][xi] += posterior_contrib;
+          }
+        }
+      }
+    }
+  }
+  
+  // 正規化（符号語確率の合計を1にする）
+  normalize(PD[idx], Q);
 }
 

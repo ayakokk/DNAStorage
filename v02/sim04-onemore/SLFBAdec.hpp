@@ -1,5 +1,12 @@
 class SLFBAdec {
 private:
+  // エラー状態定数
+  static const int ERROR_MATCH = 0;
+  static const int ERROR_INSERTION = 1;
+  static const int ERROR_DELETION = 2;
+  static const int ERROR_SUBSTITUTION = 3;
+  static const int NUM_ERROR_STATES = 4;
+  
   int    Ns;            // block length (symbol)
   int    Nu;            // symbol size (bit)
   int    Nb;            // = Ns*Nu (bit)
@@ -15,6 +22,11 @@ private:
   double **PU, **PD;    // [Ns][Q]:      FG up/down
   double **PI, **PO;    // [Ns][Q]:      FG input/output
   unsigned char *Yin;   // [Nb+Dmax]: received word
+  
+  // エラー状態関連データ構造
+  double ***PFE, ***PBE; // [Ns+1][Drng][NUM_ERROR_STATES]: エラー状態を含む前進/後進確率
+  double ***PE;          // [Ns][NUM_ERROR_STATES][NUM_ERROR_STATES]: エラー状態遷移確率
+  int k_mer_length;      // k-merの長さ（将来の拡張用）
   class InnerCodebook *ICB;
   class ChannelMatrix *ECM;   // (encoding CM)
   class IDSchannel    *CH;
@@ -47,6 +59,15 @@ private:
   void CalcPF(int idx, int Nb2);  // PF
   void CalcPB(int idx, int Nb2);  // PB
   void CalcPD(int idx, int Nb2);  // PD
+  
+  // エラー状態関連関数
+  void SetFGE();                  // エラー状態拡張FGデータ構造の設定
+  void DelFGE();                  // エラー状態拡張FGデータ構造の削除
+  void InitFGE(const unsigned char *RW, const double **Pin, int Nb2); // エラー状態拡張FGの初期化
+  void CalcPE(int idx);           // エラー状態遷移確率の計算
+  void CalcPFE(int idx, int Nb2); // エラー状態を含む前進確率
+  void CalcPBE(int idx, int Nb2); // エラー状態を含む後進確率
+  void CalcPDE(int idx, int Nb2); // エラー状態を含む事後確率計算
 public:
   SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class IDSchannel *_CH);
   ~SLFBAdec();
