@@ -521,16 +521,28 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
   int idx;
   assert( Nb2>=Nb+Dmin && Nb2<=Nb+Dmax );
   
-  // 段階1a: エラー状態メモリ付き3Dラティスデコーダー
-  printf("# Using 3D lattice decoder with error state memory\n");
-  InitFGE(RW,Pin,Nb2);
-  for(idx=0;   idx<Ns;idx++) CalcPU(idx);
-  for(idx=0;   idx<Ns;idx++) CalcPFE(idx,Nb2);   // 3D前進確率
-  for(idx=Ns-1;idx>=0;idx--) CalcPBE(idx,Nb2);   // 3D後進確率
+  // デコーダー選択: 環境変数DECODER_MODEで制御
+  // DECODER_MODE=LEGACY: 従来の2Dデコーダー（ベースライン）
+  // DECODER_MODE=DEC2:   新しい3Dラティスデコーダー（Dec2）
+  const char* decoder_mode = getenv("DECODER_MODE");
   
-  // 3Dエラー状態拡張版の事後確率計算
-  for(idx=0;   idx<Ns;idx++) CalcPDE(idx,Nb2);   // 3D事後確率
-  for(idx=0;   idx<Ns;idx++) CalcPO(idx);
+  if (decoder_mode && strcmp(decoder_mode, "LEGACY") == 0) {
+    printf("# Using LEGACY 2D decoder (baseline)\n");
+    InitFG(RW,Pin,Nb2);
+    for(idx=0;   idx<Ns;idx++) CalcPU(idx);
+    for(idx=0;   idx<Ns;idx++) CalcPF(idx,Nb2);
+    for(idx=Ns-1;idx>=0;idx--) CalcPB(idx,Nb2);
+    for(idx=0;   idx<Ns;idx++) CalcPD(idx,Nb2);
+    for(idx=0;   idx<Ns;idx++) CalcPO(idx);
+  } else {
+    printf("# Using Dec2 3D lattice decoder with error state memory\n");
+    InitFGE(RW,Pin,Nb2);
+    for(idx=0;   idx<Ns;idx++) CalcPU(idx);
+    for(idx=0;   idx<Ns;idx++) CalcPFE(idx,Nb2);   // 3D前進確率
+    for(idx=Ns-1;idx>=0;idx--) CalcPBE(idx,Nb2);   // 3D後進確率
+    for(idx=0;   idx<Ns;idx++) CalcPDE(idx,Nb2);   // 3D事後確率
+    for(idx=0;   idx<Ns;idx++) CalcPO(idx);
+  }
   CopyMat(Pout,(const double**)PO,Ns,Q);
   
   // PrintNode(dbgIW);
