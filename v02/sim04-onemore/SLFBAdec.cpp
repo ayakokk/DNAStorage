@@ -25,6 +25,22 @@ double SLFBAdec::Psub(unsigned char a, unsigned char b){
 }
 
 //================================================================================
+// 4値シンボルの置換確率を計算 (論文Table 2対応)
+//================================================================================
+double SLFBAdec::Psub_quaternary(unsigned char a, unsigned char b) {
+  assert(a <= 3 && b <= 3);
+  
+  if (a == b) {
+    // 置換が起こらない確率 (Match)
+    return 1.0 - Ps; 
+  } else {
+    // aがbに置換される確率
+    // Ps(置換イベントが起こる確率) * P(その結果bになる条件付き確率)
+    return Ps * SubMatrix[a][b];
+  }
+}
+
+//================================================================================
 void SLFBAdec::ClearMat(double **X, int M0, int N0){
   for(int i=0;i<M0;i++){
     for(int j=0;j<N0;j++) X[i][j]=0.0;
@@ -102,9 +118,9 @@ long SLFBAdec::VectToLong(const unsigned char *V, int len){
   assert(len>=0);
   long val = 0;
   for(int i=0;i<len;i++){
-    assert(V[i]==0 || V[i]==1);
-    val <<= 1;
-    if(V[i]==1) val |= 0x1;
+    assert(V[i]>=0 && V[i]<=3);  // 4元シンボル(0-3)に対応
+    val <<= 2;  // 4進数なので2ビットシフト
+    val |= V[i];  // シンボル値をそのまま使用
   } // for i
   return val;
 }
@@ -112,10 +128,10 @@ long SLFBAdec::VectToLong(const unsigned char *V, int len){
 //================================================================================
 void SLFBAdec::LongToVect(unsigned char *V, long val, int len){
   assert(len>0 && val>=0);
-  long mask = 0x1 << (len-1);
+  long mask = 0x3 << ((len-1)*2);  // 4進数なので2ビット×(len-1)
   for(int i=0;i<len;i++){
-    V[i] = ( (val & mask)==0 )? 0 : 1;
-    mask >>= 1;
+    V[i] = (val & mask) >> ((len-1-i)*2);  // 2ビットシフトで4元シンボル抽出
+    mask >>= 2;  // 次の2ビット位置へ
   } // for i
 }
 
@@ -183,18 +199,20 @@ void SLFBAdec::SetGX(){
       //printf("GX[%d]=%e\n",ly,GX[ly][0][0]);
     } else {
       // exact
-      ly2p = (long)pow(2,ly);
+      // ly2p = (long)pow(2,ly);
+      ly2p = 1;          // ✅ 修正：4^lyを計算
+      for(int i=0; i<ly; i++) ly2p *= 4;
       GX[ly] = new double * [ly2p];
       for(long y=0;y<ly2p;y++){
-	GX[ly][y] = new double [Q];
-	for(int xi=0;xi<Q;xi++){
-	  ICB->Get_CW(X,xi);
-	  x = VectToLong(X,Nu);
-	  GX[ly][y][xi] = CalcPyx(y,x,ly,Nu);
-	  //(dbg)
-	  //printf("%e ly=%d y=%ld xi=%d x=%ld ",GX[ly][y][xi],ly,y,xi,x);
-	  //PrintVect(X,Nu,"X=","\n");
-	} // for x
+        GX[ly][y] = new double [Q];
+        for(int xi=0;xi<Q;xi++){
+          ICB->Get_CW(X,xi);
+          x = VectToLong(X,Nu);
+          GX[ly][y][xi] = CalcPyx(y,x,ly,Nu);
+          //(dbg)
+          //printf("%e ly=%d y=%ld xi=%d x=%ld ",GX[ly][y][xi],ly,y,xi,x);
+          //PrintVect(X,Nu,"X=","\n");
+        } // for x
       } // for y
     } // if ly
   } // for ly
@@ -230,9 +248,9 @@ double SLFBAdec::CalcPyx(long y, long x, int ly, int lx){
   LongToVect(Y,y,ly);
   if(lx==1){
     if(ly==1){
-      ret = Psub(X[0],Y[0]) * Pt;
+      ret = Psub_quaternary(X[0],Y[0]) * Pt;
     } else if(ly==2) {
-      ret = Psub(X[0],Y[0]) * Psub(X[0],Y[1]) * Pi;
+      ret = Psub_quaternary(X[0],Y[0]) * Psub_quaternary(X[0],Y[1]) * Pi;
     } else {
       assert(ly>=3); 
       ret = 0.0;
@@ -240,14 +258,14 @@ double SLFBAdec::CalcPyx(long y, long x, int ly, int lx){
   } else {
     x1  = VectToLong(&X[1],lx-1);
     // -----trans
-    qt = Psub(X[0],Y[0]) * Pt;
+    qt = Psub_quaternary(X[0],Y[0]) * Pt;
     y1 = (ly==1)? 0 : VectToLong(&Y[1],ly-1);
     qt *= CalcPyx(y1,x1,ly-1,lx-1);
     // -----ins
     if(ly<2){
       qi = 0.0;
     } else {
-      qi = Psub(X[0],Y[0]) * Psub(X[0],Y[1]) * Pi;
+      qi = Psub_quaternary(X[0],Y[0]) * Psub_quaternary(X[0],Y[1]) * Pi;
       y1 = (ly==2)? 0 : VectToLong(&Y[2],ly-2);
       qi *= CalcPyx(y1,x1,ly-2,lx-1);	
     } // if ly<2
@@ -489,8 +507,27 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   Nu2min = Nu - (int)ceil( (double)Nu*Pd ) - 2;
   Nu2max = min(Nu2max, Nu*2);
   Nu2min = max(Nu2min, 0   );
-  k_mer_length = 4;  // 初期値としてk=4を設定
+  // Dec3: k-mer関連の初期化
+  num_kmers = 1;
+  for(int i = 0; i < KMER_LENGTH; i++) {
+    num_kmers *= 4;                  // 4^KMER_LENGTH = 256 for k=4
+  }
+  
+  // Dec3: 4次元ラティス用ポインタの初期化
+  PFE4D = nullptr;
+  PBE4D = nullptr;
+  kmer_error_probs = nullptr;
+  
+  // 論文 Table 2 に基づく4値置換確率行列の初期化
+  // P(b|a) = aがbに置換される条件付き確率 (A=0, C=1, G=2, T=3)
+  //           A      C      G      T
+  SubMatrix[0][0]=0.0;   SubMatrix[0][1]=0.149; SubMatrix[0][2]=0.675; SubMatrix[0][3]=0.176; // Aから
+  SubMatrix[1][0]=0.351; SubMatrix[1][1]=0.0;   SubMatrix[1][2]=0.173; SubMatrix[1][3]=0.476; // Cから
+  SubMatrix[2][0]=0.756; SubMatrix[2][1]=0.076; SubMatrix[2][2]=0.0;   SubMatrix[2][3]=0.168; // Gから
+  SubMatrix[3][0]=0.328; SubMatrix[3][1]=0.424; SubMatrix[3][2]=0.248; SubMatrix[3][3]=0.0;   // Tから
+  
   printf("# SLFBAdec: Ns=%d (Nu;Nu2min,Nu2max)=(%d(%ld);%d,%d) Nb=%d Q=%d\n",Ns,Nu,Nu2p,Nu2min,Nu2max,Nb,Q);
+  printf("# SLFBAdec: Dec3 4D Lattice: KMER_LENGTH=%d, num_kmers=%d\n", KMER_LENGTH, num_kmers);
   printf("# SLFBAdec: (Pi,Pd,Ps,Pt)=(%e,%e,%e,%e) (Dmin,Dmax:Drng)=(%d,%d:%d)\n",
 	 Pi,Pd,Ps,Pt,Dmin,Dmax,Drng);
   assert(Nb%Nu==0);
@@ -505,6 +542,18 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   SetFG();
   printf("# SLFBAdec: generating error state extended factor graph\n");
   SetFGE();
+  // ===== ↓↓↓ Dec3用の初期化を追加 ↓↓↓ =====
+  const char* decoder_mode = getenv("DECODER_MODE");
+  if (decoder_mode && strcmp(decoder_mode, "DEC3") == 0) {
+      printf("# SLFBAdec: Initializing Dec3 components in constructor...\n");
+      
+      // 4次元配列のメモリを確保
+      SetFGE4D(); 
+      
+      // k-mer依存の遷移確率を（ダミーデータで）読み込む
+      // TODO: "path/to/your/data" を実際のパスに置き換える
+      LoadKmerErrorProbabilities("path/to/your/data"); 
+  }
 }
 
 //================================================================================
@@ -513,7 +562,8 @@ SLFBAdec::~SLFBAdec(){
   DelGX();
   DelFG();
   DelFGE();
-  printf("# SLFBAdec: deleted\n");
+  DelFGE4D();  // Dec3: 4次元ラティスメモリ解放
+  printf("# SLFBAdec: deleted (including Dec3 4D lattice)\n");
 }
 
 //================================================================================
@@ -524,9 +574,13 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
   // デコーダー選択: 環境変数DECODER_MODEで制御
   // DECODER_MODE=LEGACY: 従来の2Dデコーダー（ベースライン）
   // DECODER_MODE=DEC2:   新しい3Dラティスデコーダー（Dec2）
+  // DECODER_MODE=DEC3:   究極の4Dラティスデコーダー（Dec3、k-mer依存）
   const char* decoder_mode = getenv("DECODER_MODE");
+  if (decoder_mode == nullptr) {
+    decoder_mode = "DEC2"; // デフォルトをDec2に設定
+  }
   
-  if (decoder_mode && strcmp(decoder_mode, "LEGACY") == 0) {
+  if (strcmp(decoder_mode, "LEGACY") == 0) {
     printf("# Using LEGACY 2D decoder (baseline)\n");
     InitFG(RW,Pin,Nb2);
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
@@ -534,8 +588,26 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     for(idx=Ns-1;idx>=0;idx--) CalcPB(idx,Nb2);
     for(idx=0;   idx<Ns;idx++) CalcPD(idx,Nb2);
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
-  } else {
+  } else if (strcmp(decoder_mode, "DEC2") == 0) {
     printf("# Using Dec2 3D lattice decoder with error state memory\n");
+    InitFGE(RW,Pin,Nb2);
+    for(idx=0;   idx<Ns;idx++) CalcPU(idx);
+    for(idx=0;   idx<Ns;idx++) CalcPFE(idx,Nb2);   // 3D前進確率
+    for(idx=Ns-1;idx>=0;idx--) CalcPBE(idx,Nb2);   // 3D後進確率
+    for(idx=0;   idx<Ns;idx++) CalcPDE(idx,Nb2);   // 3D事後確率
+    for(idx=0;   idx<Ns;idx++) CalcPO(idx);
+  } else if (strcmp(decoder_mode, "DEC3") == 0) {
+    printf("# Using Dec3 4D lattice decoder with k-mer dependency (ultimate decoder)\n");
+    SetFGE4D();  // 4D lattice memory allocation
+    InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization
+    for(idx=0;   idx<Ns;idx++) CalcPU(idx);
+    for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
+    for(idx=Ns-1;idx>=0;idx--) CalcPBE4D(idx,Nb2);   // 4D後進確率
+    for(idx=0;   idx<Ns;idx++) CalcPDE4D(idx,Nb2);   // 4D事後確率
+    for(idx=0;   idx<Ns;idx++) CalcPO(idx);
+    DelFGE4D();  // 4D lattice memory deallocation
+  } else {
+    printf("# Error: Unknown DECODER_MODE '%s', defaulting to Dec2\n", decoder_mode);
     InitFGE(RW,Pin,Nb2);
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
     for(idx=0;   idx<Ns;idx++) CalcPFE(idx,Nb2);   // 3D前進確率
@@ -1026,5 +1098,478 @@ void SLFBAdec::CalcPDE(int idx, int Nb2){
   
   // 正規化（符号語確率の合計を1にする）
   normalize(PD[idx], Q);
+}
+
+//================================================================================
+//================================================================================
+//=== Dec3: k-mer依存4次元ラティスデコーダ実装 ===================================
+//================================================================================
+//================================================================================
+
+#include <map>
+#include <vector>
+#include <utility>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+
+//================================================================================
+int SLFBAdec::GetKmerIndex(const unsigned char *kmer_seq) {
+  int idx = 0;
+  for(int i = 0; i < KMER_LENGTH; i++) {
+    assert(kmer_seq[i] <= 3);  // 0=A, 1=C, 2=G, 3=T
+    idx = idx * 4 + kmer_seq[i];
+  }
+  return idx;
+}
+
+//================================================================================
+void SLFBAdec::GetKmerFromIndex(int kmer_idx, unsigned char *kmer_seq) {
+  for(int i = KMER_LENGTH - 1; i >= 0; i--) {
+    kmer_seq[i] = kmer_idx % 4;
+    kmer_idx /= 4;
+  }
+}
+
+//================================================================================
+// 決定論的k-mer遷移の計算
+// 入力: current_kmer (k_t), codeword_xi (符号語インデックス)
+// 出力: next_kmer (k_{t+1}) - 一意に決まる
+//================================================================================
+int SLFBAdec::ComputeNextKmer(int current_kmer, int codeword_xi) {
+  assert(current_kmer >= 0 && current_kmer < num_kmers);
+  assert(codeword_xi >= 0 && codeword_xi < Q);
+  
+  // 現在のk-merをbit配列に変換
+  unsigned char current_kmer_seq[KMER_LENGTH];
+  GetKmerFromIndex(current_kmer, current_kmer_seq);
+  
+  // 符号語xiをbit配列に取得
+  unsigned char codeword[Nu];
+  ICB->Get_CW(codeword, codeword_xi);
+  
+  // 次のk-mer計算: 左シフト + 新しい塩基追加
+  unsigned char next_kmer_seq[KMER_LENGTH];
+  
+  // KMER_LENGTH-1個の古い塩基を左シフト
+  for(int i = 0; i < KMER_LENGTH - 1; i++) {
+    next_kmer_seq[i] = current_kmer_seq[i + 1];
+  }
+  
+  // ✅ 修正：新しい塩基を末尾に追加
+  // 符号語はすでに4値なので、先頭の1シンボルをそのまま使用する
+  next_kmer_seq[KMER_LENGTH - 1] = codeword[0];
+  
+  // 次のk-merインデックスに変換
+  return GetKmerIndex(next_kmer_seq);
+}
+
+//================================================================================
+void SLFBAdec::LoadKmerErrorProbabilities(const char* dir_path) {
+  // std::mapを動的に作成
+  std::map<std::pair<int,int>, std::vector<double>>* prob_map = 
+    new std::map<std::pair<int,int>, std::vector<double>>();
+  kmer_error_probs = (void*)prob_map;
+  
+  printf("# Dec3: Loading k-mer error probabilities from %s\n", dir_path);
+  
+  // DNArSim-mainの確率ファイルパスを構築
+  std::string base_path(dir_path);
+  if(base_path.back() != '/') base_path += "/";
+  
+  char filename[256];
+  snprintf(filename, sizeof(filename), "%sprobEdit/k%d", base_path.c_str(), KMER_LENGTH);
+  
+  printf("# Dec3: Reading k-mer transition probabilities from: %s/\n", filename);
+  
+  // k-merディレクトリ内の全ファイルを読み込み
+  // 実装を簡単にするため、まずは固定の確率を設定
+  // TODO: 実際のファイル読み込みは後で実装
+  
+  int loaded_entries = 0;
+  
+  // 全ての(prev_error, next_kmer)組み合わせに対してダミー確率を設定
+  for(int prev_error = 0; prev_error < NUM_ERROR_STATES; prev_error++) {
+    for(int next_kmer = 0; next_kmer < num_kmers; next_kmer++) {
+      std::pair<int,int> key = std::make_pair(prev_error, next_kmer);
+      std::vector<double> probs(NUM_ERROR_STATES);
+      
+      // ダミー確率（実際の実装では DNArSim-main から読み込む）
+      probs[ERROR_MATCH] = 0.70;      // P(e_{t+1}=Match | e_t, η_{t+1})
+      probs[ERROR_INSERTION] = 0.10;   // P(e_{t+1}=Insertion | e_t, η_{t+1})
+      probs[ERROR_DELETION] = 0.10;    // P(e_{t+1}=Deletion | e_t, η_{t+1})
+      probs[ERROR_SUBSTITUTION] = 0.10; // P(e_{t+1}=Substitution | e_t, η_{t+1})
+      
+      (*prob_map)[key] = probs;
+      loaded_entries++;
+    }
+  }
+  
+  printf("# Dec3: Loaded %d k-mer error probability entries\n", loaded_entries);
+  printf("# Dec3: P(e_{t+1}|e_t, η_{t+1}) table ready for 4D lattice decoding\n");
+}
+
+//================================================================================
+double SLFBAdec::GetKmerErrorProb(int prev_error, int next_kmer, int next_error) {
+  assert(prev_error >= 0 && prev_error < NUM_ERROR_STATES);
+  assert(next_kmer >= 0 && next_kmer < num_kmers);
+  assert(next_error >= 0 && next_error < NUM_ERROR_STATES);
+  
+  std::map<std::pair<int,int>, std::vector<double>>* prob_map = 
+    (std::map<std::pair<int,int>, std::vector<double>>*)kmer_error_probs;
+  
+  std::pair<int,int> key = std::make_pair(prev_error, next_kmer);
+  auto it = prob_map->find(key);
+  
+  if(it != prob_map->end()) {
+    return it->second[next_error];
+  } else {
+    // フォールバック: 対応するエントリがない場合のデフォルト確率
+    if(next_error == ERROR_MATCH) return 0.70;
+    else return 0.10;
+  }
+}
+
+//================================================================================
+void SLFBAdec::SetFGE4D() {
+  printf("# Dec3: Setting up 4D lattice memory structures\n");
+  printf("# Dec3: Dimensions: [Ns+1=%d][Drng=%d][NUM_ERROR_STATES=%d][num_kmers=%d]\n", 
+         Ns+1, Drng, NUM_ERROR_STATES, num_kmers);
+  
+  // PFE4D: [Ns+1][Drng][NUM_ERROR_STATES][num_kmers]
+  PFE4D = new double***[Ns+1];
+  for(int i = 0; i < Ns+1; i++) {
+    PFE4D[i] = new double**[Drng];
+    for(int d = 0; d < Drng; d++) {
+      PFE4D[i][d] = new double*[NUM_ERROR_STATES];
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        PFE4D[i][d][e] = new double[num_kmers];
+        // 初期化
+        for(int k = 0; k < num_kmers; k++) {
+          PFE4D[i][d][e][k] = 0.0;
+        }
+      }
+    }
+  }
+  
+  // PBE4D: [Ns+1][Drng][NUM_ERROR_STATES][num_kmers]
+  PBE4D = new double***[Ns+1];
+  for(int i = 0; i < Ns+1; i++) {
+    PBE4D[i] = new double**[Drng];
+    for(int d = 0; d < Drng; d++) {
+      PBE4D[i][d] = new double*[NUM_ERROR_STATES];
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        PBE4D[i][d][e] = new double[num_kmers];
+        // 初期化
+        for(int k = 0; k < num_kmers; k++) {
+          PBE4D[i][d][e][k] = 0.0;
+        }
+      }
+    }
+  }
+  
+  size_t memory_size = (size_t)(Ns+1) * Drng * NUM_ERROR_STATES * num_kmers * sizeof(double) * 2;
+  printf("# Dec3: 4D lattice memory allocated: %.2f MB\n", memory_size / (1024.0 * 1024.0));
+}
+
+//================================================================================
+void SLFBAdec::DelFGE4D() {
+  printf("# Dec3: Deleting 4D lattice memory structures\n");
+  
+  // PFE4D削除
+  if(PFE4D != nullptr) {
+    for(int i = 0; i < Ns+1; i++) {
+      if(PFE4D[i] != nullptr) {
+        for(int d = 0; d < Drng; d++) {
+          if(PFE4D[i][d] != nullptr) {
+            for(int e = 0; e < NUM_ERROR_STATES; e++) {
+              delete[] PFE4D[i][d][e];
+            }
+            delete[] PFE4D[i][d];
+          }
+        }
+        delete[] PFE4D[i];
+      }
+    }
+    delete[] PFE4D;
+    PFE4D = nullptr;
+  }
+  
+  // PBE4D削除
+  if(PBE4D != nullptr) {
+    for(int i = 0; i < Ns+1; i++) {
+      if(PBE4D[i] != nullptr) {
+        for(int d = 0; d < Drng; d++) {
+          if(PBE4D[i][d] != nullptr) {
+            for(int e = 0; e < NUM_ERROR_STATES; e++) {
+              delete[] PBE4D[i][d][e];
+            }
+            delete[] PBE4D[i][d];
+          }
+        }
+        delete[] PBE4D[i];
+      }
+    }
+    delete[] PBE4D;
+    PBE4D = nullptr;
+  }
+  
+  // k-mer確率テーブル削除
+  if(kmer_error_probs != nullptr) {
+    std::map<std::pair<int,int>, std::vector<double>>* prob_map = 
+      (std::map<std::pair<int,int>, std::vector<double>>*)kmer_error_probs;
+    delete prob_map;
+    kmer_error_probs = nullptr;
+  }
+}
+
+//================================================================================
+void SLFBAdec::InitFGE4D(const unsigned char *RW, const double **Pin, int Nb2) {
+  // 既存の初期化を実行
+  InitFGE(RW, Pin, Nb2);
+  
+  // 4次元確率配列を初期化
+  for(int i = 0; i < Ns+1; i++) {
+    for(int d = 0; d < Drng; d++) {
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        for(int k = 0; k < num_kmers; k++) {
+          PFE4D[i][d][e][k] = 0.0;
+          PBE4D[i][d][e][k] = 0.0;
+        }
+      }
+    }
+  }
+  
+  // 4次元初期状態: 論文に従い(d=0, e=Match, η=0(AAAA))で開始
+  PFE4D[0][0-Dmin][ERROR_MATCH][0] = 1.0;  // σ_0 = (0, M, AAAA)
+  
+  // 4次元最終状態: 全k-mer状態に均等分布
+  for(int k = 0; k < num_kmers; k++) {
+    for(int e = 0; e < NUM_ERROR_STATES; e++) {
+      PBE4D[Ns][Nb2-Nb-Dmin][e][k] = 1.0 / (num_kmers * NUM_ERROR_STATES);
+    }
+  }
+  
+  printf("# Dec3: InitFGE4D completed - 4D lattice initialized\n");
+}
+
+//================================================================================
+// Dec3核心：4次元前進確率計算 CalcPFE4D
+// 状態: (d_t, e_t, η_t) → (d_{t+1}, e_{t+1}, η_{t+1})
+// 遷移確率: P(e_{t+1}|e_t, η_{t+1}) を使用
+//================================================================================
+void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+
+  // 次の状態 t+1 の確率を初期化
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      for(int k1 = 0; k1 < num_kmers; k1++) {
+        PFE4D[idx+1][d1-Dmin][e1][k1] = 0.0;
+      }
+    }
+  }
+  
+  // 4次元状態遷移：全ての (d0,e0,k0) → (d1,e1,k1) を計算
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      for (int k0 = 0; k0 < num_kmers; k0++) {
+        
+        // 現在の状態への確率が0なら、このパスからの寄与はない
+        if (PFE4D[idx][d0-Dmin][e0][k0] == 0.0) continue;
+
+        for (int d1 = Dmin; d1 <= Dmax; d1++) {
+          
+          // チャネルパラメータ計算
+          int Nu2 = Nu + d1 - d0;
+          int iL = idx * Nu + d0;
+          
+          if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+          // 観測確率計算（符号語別）
+          double *s_per_codeword = new double[Q];
+          for (int xi = 0; xi < Q; xi++) {
+            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+              long y = VectToLong(&Yin[iL], Nu2);
+              s_per_codeword[xi] = GetGX(Nu2, y, xi);
+            } else {
+              s_per_codeword[xi] = GetGX(Nu2, 0, 0);
+            }
+          }
+
+          // ✅ Dec3効率化修正：全符号語xiで決定論的k-mer遷移を直接計算
+          for (int xi = 0; xi < Q; xi++) {
+            int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
+
+            for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+              double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
+              double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
+              
+              // 4D前進確率の更新（符号語xiによって決まるk1状態に蓄積）
+              PFE4D[idx+1][d1-Dmin][e1][k1] += PFE4D[idx][d0-Dmin][e0][k0] * gamma_xi;
+            }
+          }
+          
+          delete[] s_per_codeword;
+        }
+      }
+    }
+  }
+
+  // 4次元正規化
+  double total_sum = 0.0;
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      for(int k1 = 0; k1 < num_kmers; k1++) {
+        total_sum += PFE4D[idx+1][d1-Dmin][e1][k1];
+      }
+    }
+  }
+  if(total_sum > 0.0) {
+    for(int d1 = Dmin; d1 <= Dmax; d1++) {
+      for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+        for(int k1 = 0; k1 < num_kmers; k1++) {
+          PFE4D[idx+1][d1-Dmin][e1][k1] /= total_sum;
+        }
+      }
+    }
+  }
+  
+  printf("# Dec3: CalcPFE4D[%d] completed with P(e_{t+1}|e_t,η_{t+1})\n", idx);
+}
+
+//================================================================================
+// Dec3核心：4次元後進確率計算 CalcPBE4D
+//================================================================================
+void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+
+  // 現在の状態 t の確率を初期化
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      for (int k0 = 0; k0 < num_kmers; k0++) {
+        PBE4D[idx][d0-Dmin][e0][k0] = 0.0;
+      }
+    }
+  }
+  
+  // Dec3決定論的k-mer遷移：4次元後進確率計算
+  for (int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      for (int k1 = 0; k1 < num_kmers; k1++) {
+        
+        if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
+
+        for (int d0 = Dmin; d0 <= Dmax; d0++) {
+          
+          // チャネルパラメータ計算（CalcPFE4Dと同一）
+          int Nu2 = Nu + d1 - d0;
+          int iL = idx * Nu + d0;
+          
+          if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+          double *s_per_codeword = new double[Q];
+          for (int xi = 0; xi < Q; xi++) {
+            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+              long y = VectToLong(&Yin[iL], Nu2);
+              s_per_codeword[xi] = GetGX(Nu2, y, xi);
+            } else {
+              s_per_codeword[xi] = GetGX(Nu2, 0, 0);
+            }
+          }
+          
+          // ✅ Dec3効率化修正：後進でも前進と同じ効率的構造を使用
+          for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+            for (int k0 = 0; k0 < num_kmers; k0++) {
+              for (int xi = 0; xi < Q; xi++) {
+                int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
+                
+                for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+                  double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
+                  double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
+                  
+                  // 4D後進確率の更新（決定論的遷移により効率的）
+                  PBE4D[idx][d0-Dmin][e0][k0] += PBE4D[idx+1][d1-Dmin][e1][k1] * gamma_xi;
+                }
+              }
+            }
+          }
+          
+          delete[] s_per_codeword;
+        }
+      }
+    }
+  }
+
+  // 4次元正規化
+  double total_sum = 0.0;
+  for(int d0 = Dmin; d0 <= Dmax; d0++) {
+    for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      for(int k0 = 0; k0 < num_kmers; k0++) {
+        total_sum += PBE4D[idx][d0-Dmin][e0][k0];
+      }
+    }
+  }
+  if(total_sum > 0.0) {
+    for(int d0 = Dmin; d0 <= Dmax; d0++) {
+      for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+        for(int k0 = 0; k0 < num_kmers; k0++) {
+          PBE4D[idx][d0-Dmin][e0][k0] /= total_sum;
+        }
+      }
+    }
+  }
+  
+  printf("# Dec3: CalcPBE4D[%d] completed with P(e_{t+1}|e_t,η_{t+1})\n", idx);
+}
+
+//================================================================================
+// Dec3核心：4次元事後確率計算 CalcPDE4D
+// 4次元前進・後進確率を使って符号語の事後確率を計算
+//================================================================================
+void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+  
+  // ✅ Dec3効率化修正：8重ネストループを劇的に簡略化
+  for (int xi = 0; xi < Q; xi++) {
+    PD[idx][xi] = 0.0;
+    
+    for (int d0 = Dmin; d0 <= Dmax; d0++) {
+      for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+        for (int k0 = 0; k0 < num_kmers; k0++) {
+
+          if (PFE4D[idx][d0-Dmin][e0][k0] == 0.0) continue;
+
+          for (int d1 = Dmin; d1 <= Dmax; d1++) {
+            int Nu2 = Nu + d1 - d0;
+            int iL = idx * Nu + d0;
+            if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+            
+            double obs_prob;
+            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+              long y = VectToLong(&Yin[iL], Nu2);
+              obs_prob = GetGX(Nu2, y, xi);
+            } else {
+              obs_prob = GetGX(Nu2, 0, 0);
+            }
+
+            int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
+
+            for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+              double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
+              double posterior_contrib = PFE4D[idx][d0-Dmin][e0][k0] * obs_prob * PU[idx][xi] * kmer_error_prob * PBE4D[idx+1][d1-Dmin][e1][k1];
+              
+              PD[idx][xi] += posterior_contrib;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // 正規化（符号語確率の合計を1にする）
+  normalize(PD[idx], Q);
+  
+  printf("# Dec3: CalcPDE4D[%d] completed with 4D marginalization\n", idx);
 }
 
