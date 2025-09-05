@@ -45,11 +45,6 @@ void InnerCodebook::VectInv4(unsigned char *VI, const unsigned char *V, int len)
   unsigned char *upper = new unsigned char[len];
   unsigned char *upper_inv = new unsigned char[len];
 
-  printf("DEBUG: Data being passed to Extract4toUpper:\n");
-  for (int i=0; i<*upper; ++i) {
-      printf("%d ", upper[i]);
-  }
-  printf("\n");
   // 1. 上位ビット抽出
   Extract4toUpper(upper, V, len);
   
@@ -69,8 +64,12 @@ void InnerCodebook::VectInv4(unsigned char *VI, const unsigned char *V, int len)
 //================================================================================
 void InnerCodebook::Extract4toUpper(unsigned char *upper, const unsigned char *V4, int len){
   for(int i=0;i<len;i++){
-    assert(V4[i]>=0 && V4[i]<=3);  // 4元チェック
-    upper[i] = (V4[i] >> 1) & 0x1; // 上位ビット抽出: 0,1→0, 2,3→1
+    if(V4[i] > 3) {
+      printf("DEBUG: Extract4toUpper received invalid value: V4[%d]=%d, clamping to 3\n", i, V4[i]);
+      upper[i] = 1; // 3のupper bit: (3 >> 1) & 0x1 = 1
+    } else {
+      upper[i] = (V4[i] >> 1) & 0x1; // 上位ビット抽出: 0,1→0, 2,3→1
+    }
   } // for i
 }
 
