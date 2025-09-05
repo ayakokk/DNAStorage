@@ -186,27 +186,20 @@ int main(int argc, char *argv[]){
   int Nb,Nb2;      // block length & recv length (bits)
   int Q, Nu;       // numCW, symbol-len [ICB]
   int seed;
-  double Pi,Pd,Ps; // IDS prob
   char *fn;
   char *fncb    = new char [BSIZE];
   char *fnconst = new char [BSIZE];
   char *fncm    = new char [BSIZE];
-  if(argc!=7){
+  if(argc!=4){
     fprintf(stderr,"Usage: %s <ICB_dir> <N> <Pi> <Pd> <Ps> <seed|-1>\n",argv[0]);
     return 1;
   } // if
   fn   =      argv[1];
   N    = atoi(argv[2]);
-  Pi   = atof(argv[3]);
-  Pd   = atof(argv[4]);
-  Ps   = atof(argv[5]);
-  seed = atoi(argv[6]);
+  seed = atoi(argv[3]);
   if(seed==-1) seed = (int)time(NULL);
   srandom(seed);
   assert(N>0);
-  assert(Pi>=0.0 && Pi<0.5);
-  assert(Pd>=0.0 && Pd<0.5);
-  assert(Ps>=0.0 && Ps<0.5);
   snprintf(fncb,   BSIZE,"%s/cb.txt",        fn);  // inner codebook (in)
   snprintf(fnconst,BSIZE,"%s/constraint.txt",fn);  // constraints (in)
   snprintf(fncm,   BSIZE,"%s/EncCM.bin",     fn);  // encoding channel matrix (in)
@@ -229,7 +222,7 @@ int main(int argc, char *argv[]){
   }
   
   class ChannelMatrix *ECM = new class ChannelMatrix(fncm);
-  class IDSchannel    *CH  = new class IDSchannel(Nb,Pi,Pd,Ps);
+  class IDSchannel    *CH  = new class IDSchannel(Nb,0.0,0.0,0.0); // dummy init
   // Initialize Dec3 decoder for BER performance test
   class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
   // [DEBUG] DCM size calculation: Q=%d, OutListSize=%d, pow(Q,OutListSize)=%.0f

@@ -14,7 +14,6 @@ private:
   int    Dmax,Dmin;     // channel
   int    Drng;          // = Dmax-Dmin+1
   int    Nu2max,Nu2min; // recv symbol length
-  long   Nu2p;          // = pow(2,Nu)
   double Pi,Pd,Ps,Pt;   // channel
   double **GD;          // [Drng][Drng]: P(d_Nu | d_0)
   double ***GX;         // [Nu2][y][x]:  P(y|x,d0,d1)
@@ -91,6 +90,9 @@ private:
   int  ComputeNextKmer(int current_kmer, int codeword_xi);     // 決定論的k-mer遷移: k_t + xi → k_{t+1}
   void LoadKmerErrorProbabilities(const char* dir_path); // DNArSim-mainから P(e_{t+1}|e_t,η_{t+1}) を読み込み
   double GetKmerErrorProb(int prev_error, int next_kmer, int next_error); // 論文式(41)の確率を取得
+  double ComputeObservationProbabilityFromDNA(int idx, int Nu2, int iL, int xi, int k0, int e0, int Nb2); // DNAチャネル統合観測確率計算
+  double CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error, int kmer, int codeword_xi); // 動的確率を使った観測確率計算(CalcPyxの進化版)
+  double Psub_quaternary(unsigned char a, unsigned char b, double dynamic_ps); // 動的ps対応のPsub_quaternaryオーバーロード
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
   void CalcPBE4D(int idx, int Nb2);    // 4次元後進確率計算
   void CalcPDE4D(int idx, int Nb2);    // 4次元事後確率計算

@@ -16,7 +16,7 @@ int main(int argc, char *argv[]){
   int Rho;         // run-length    [constraint.txt]
   int ell,Delta;   // local-balance [constraint.txt]
   int N;           // block length (symbols)
-  int Nb,Nb2;      // block length & recv length (bits)
+  int Nb;      // block length & recv length (bits)
   int Q, Nu;       // numCW, symbol-len [ICB]
   double Pi,Pd,Ps; // IDS prob
   char *fn;

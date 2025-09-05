@@ -496,11 +496,13 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   Nb   = CH->GetN();
   Dmax = CH->GetDmax();
   Dmin = CH->GetDmin();
-  Pi   = CH->GetPi();
-  Pd   = CH->GetPd();
-  Ps   = CH->GetPs();
-  Pt   = 1.0-Pi-Pd;
-  Nu2p = (long) pow(2,Nu);
+  // Pi, Pd, Ps は Legacy/Dec2 用のメンバ変数として保持
+  this->Pi = CH->GetPi();
+  this->Pd = CH->GetPd();
+  this->Ps = CH->GetPs();
+  this->Pt = 1.0 - this->Pi - this->Pd;
+
+  // Nu2p = (long) pow(2,Nu);
   Ns   = Nb/Nu;
   Drng = Dmax-Dmin+1;
   Nu2max = Nu + (int)ceil( (double)Nu*Pi ) + 2;
@@ -526,33 +528,35 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   SubMatrix[2][0]=0.756; SubMatrix[2][1]=0.076; SubMatrix[2][2]=0.0;   SubMatrix[2][3]=0.168; // Gから
   SubMatrix[3][0]=0.328; SubMatrix[3][1]=0.424; SubMatrix[3][2]=0.248; SubMatrix[3][3]=0.0;   // Tから
   
-  printf("# SLFBAdec: Ns=%d (Nu;Nu2min,Nu2max)=(%d(%ld);%d,%d) Nb=%d Q=%d\n",Ns,Nu,Nu2p,Nu2min,Nu2max,Nb,Q);
-  printf("# SLFBAdec: Dec3 4D Lattice: KMER_LENGTH=%d, num_kmers=%d\n", KMER_LENGTH, num_kmers);
-  printf("# SLFBAdec: (Pi,Pd,Ps,Pt)=(%e,%e,%e,%e) (Dmin,Dmax:Drng)=(%d,%d:%d)\n",
-	 Pi,Pd,Ps,Pt,Dmin,Dmax,Drng);
   assert(Nb%Nu==0);
   assert(Nu<=NuMax);
   assert(ECM->GetM()==Q && ECM->GetN()==Q);
   assert(Pt>0.0 && Pt<=1.0);
   //----- set tables
-  printf("# SLFBAdec: generating GD & GX\n");
-  SetGD();
-  SetGX();
-  printf("# SLFBAdec: generating factor graph\n");
-  SetFG();
-  printf("# SLFBAdec: generating error state extended factor graph\n");
-  SetFGE();
-  // ===== ↓↓↓ Dec3用の初期化を追加 ↓↓↓ =====
   const char* decoder_mode = getenv("DECODER_MODE");
-  if (decoder_mode && strcmp(decoder_mode, "DEC3") == 0) {
-      printf("# SLFBAdec: Initializing Dec3 components in constructor...\n");
-      
-      // 4次元配列のメモリを確保
+  if (decoder_mode == nullptr) decoder_mode = "DEC3"; // デフォルトをDEC3に
+  
+   if (strcmp(decoder_mode, "DEC3") == 0) {
+      // --- Dec3用の初期化 ---
+      printf("# SLFBAdec: Initializing for DEC3 mode.\n");
+      printf("# SLFBAdec: Skipping SetGD() and SetGX() pre-calculation.\n");
+      SetFG();
+      SetFGE();
       SetFGE4D(); 
-      
-      // k-mer依存の遷移確率を（ダミーデータで）読み込む
-      // TODO: "path/to/your/data" を実際のパスに置き換える
-      LoadKmerErrorProbabilities("path/to/your/data"); 
+      LoadKmerErrorProbabilities("DNArSim-main"); 
+  } else {
+      // --- Legacy/Dec2用の初期化 ---
+      printf("# SLFBAdec: Initializing for LEGACY/DEC2 mode.\n");
+      printf("# SLFBAdec: Performing SetGD() and SetGX() pre-calculation. This may take a very long time...\n");
+      Nu2max = Nu + (int)ceil((double)Nu*Pi) + 2;
+      Nu2min = Nu - (int)ceil((double)Nu*Pd) - 2;
+      Nu2max = min(Nu2max, Nu*2);
+      Nu2min = max(Nu2min, 0);
+
+      SetGD();
+      SetGX(); // 巨大なメモリ確保と計算爆発が起こる可能性がある
+      SetFG();
+      SetFGE();
   }
 }
 
@@ -598,7 +602,6 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
   } else if (strcmp(decoder_mode, "DEC3") == 0) {
     printf("# Using Dec3 4D lattice decoder with k-mer dependency (ultimate decoder)\n");
-    SetFGE4D();  // 4D lattice memory allocation
     InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
     for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
@@ -1171,42 +1174,104 @@ void SLFBAdec::LoadKmerErrorProbabilities(const char* dir_path) {
     new std::map<std::pair<int,int>, std::vector<double>>();
   kmer_error_probs = (void*)prob_map;
   
-  printf("# Dec3: Loading k-mer error probabilities from %s\n", dir_path);
+  printf("# Dec3: Loading REAL P(e_{t+1}|e_t, η_{t+1}) from DNArSim-main\n");
   
-  // DNArSim-mainの確率ファイルパスを構築
-  std::string base_path(dir_path);
-  if(base_path.back() != '/') base_path += "/";
+  // DNArSim-mainの確率ファイルパスを構築  
+  char prob_dir[512];
+  snprintf(prob_dir, sizeof(prob_dir), "%s/simulator/probEdit/k%d", dir_path, KMER_LENGTH);
+  printf("# Dec3: Reading from: %s/\n", prob_dir);
   
-  char filename[256];
-  snprintf(filename, sizeof(filename), "%sprobEdit/k%d", base_path.c_str(), KMER_LENGTH);
-  
-  printf("# Dec3: Reading k-mer transition probabilities from: %s/\n", filename);
-  
-  // k-merディレクトリ内の全ファイルを読み込み
-  // 実装を簡単にするため、まずは固定の確率を設定
-  // TODO: 実際のファイル読み込みは後で実装
+  // 4つのエラー状態に対応するファイル名
+  const char* error_files[NUM_ERROR_STATES] = {
+    "KmerYi_prevYiM_RatesAvg.txt",  // ERROR_MATCH = 0
+    "KmerYi_prevYiI_RatesAvg.txt",  // ERROR_INSERTION = 1  
+    "KmerYi_prevYiD_RatesAvg.txt",  // ERROR_DELETION = 2
+    "KmerYi_prevYiS_RatesAvg.txt"   // ERROR_SUBSTITUTION = 3
+  };
   
   int loaded_entries = 0;
+  int file_errors = 0;
   
-  // 全ての(prev_error, next_kmer)組み合わせに対してダミー確率を設定
+  // 各エラー状態に対してファイルを読み込み
   for(int prev_error = 0; prev_error < NUM_ERROR_STATES; prev_error++) {
-    for(int next_kmer = 0; next_kmer < num_kmers; next_kmer++) {
-      std::pair<int,int> key = std::make_pair(prev_error, next_kmer);
-      std::vector<double> probs(NUM_ERROR_STATES);
+    char filepath[1024];
+    snprintf(filepath, sizeof(filepath), "%s/%s", prob_dir, error_files[prev_error]);
+    
+    FILE* file = fopen(filepath, "r");
+    if(!file) {
+      printf("# Dec3: Warning - Could not open %s\n", filepath);
+      file_errors++;
+      continue;
+    }
+    
+    printf("# Dec3: Reading %s...\n", error_files[prev_error]);
+    
+    char line[256];
+    char kmer_str[16];
+    double ins_prob, del_prob, subst_prob, err_prob, match_prob;
+    
+    while(fgets(line, sizeof(line), file)) {
+      // ファイル形式: "KMER Ins Del Subst Err Match"
+      if(sscanf(line, "%s %lf %lf %lf %lf %lf", 
+                kmer_str, &ins_prob, &del_prob, &subst_prob, &err_prob, &match_prob) == 6) {
+        
+        // k-mer文字列をインデックスに変換
+        if(strlen(kmer_str) != KMER_LENGTH) continue;
+        
+        unsigned char kmer_seq[KMER_LENGTH];
+        bool valid_kmer = true;
+        for(int i = 0; i < KMER_LENGTH; i++) {
+          switch(kmer_str[i]) {
+            case 'A': kmer_seq[i] = 0; break;
+            case 'C': kmer_seq[i] = 1; break;
+            case 'G': kmer_seq[i] = 2; break;
+            case 'T': kmer_seq[i] = 3; break;
+            default: valid_kmer = false; break;
+          }
+        }
+        
+        if(!valid_kmer) continue;
+        
+        int kmer_idx = GetKmerIndex(kmer_seq);
+        
+        // 確率ベクトルを構築
+        std::pair<int,int> key = std::make_pair(prev_error, kmer_idx);
+        std::vector<double> probs(NUM_ERROR_STATES);
+        
+        probs[ERROR_MATCH] = match_prob;           // P(e_{t+1}=Match | e_t, η_{t+1})
+        probs[ERROR_INSERTION] = ins_prob;         // P(e_{t+1}=Insertion | e_t, η_{t+1})
+        probs[ERROR_DELETION] = del_prob;          // P(e_{t+1}=Deletion | e_t, η_{t+1})
+        probs[ERROR_SUBSTITUTION] = subst_prob;    // P(e_{t+1}=Substitution | e_t, η_{t+1})
+        
+        (*prob_map)[key] = probs;
+        loaded_entries++;
+      }
+    }
+    
+    fclose(file);
+  }
+  
+  // 読み込めなかったエントリに対してフォールバック値を設定
+  for(int prev_error = 0; prev_error < NUM_ERROR_STATES; prev_error++) {
+    for(int kmer_idx = 0; kmer_idx < num_kmers; kmer_idx++) {
+      std::pair<int,int> key = std::make_pair(prev_error, kmer_idx);
       
-      // ダミー確率（実際の実装では DNArSim-main から読み込む）
-      probs[ERROR_MATCH] = 0.70;      // P(e_{t+1}=Match | e_t, η_{t+1})
-      probs[ERROR_INSERTION] = 0.10;   // P(e_{t+1}=Insertion | e_t, η_{t+1})
-      probs[ERROR_DELETION] = 0.10;    // P(e_{t+1}=Deletion | e_t, η_{t+1})
-      probs[ERROR_SUBSTITUTION] = 0.10; // P(e_{t+1}=Substitution | e_t, η_{t+1})
-      
-      (*prob_map)[key] = probs;
-      loaded_entries++;
+      if(prob_map->find(key) == prob_map->end()) {
+        // フォールバック: 理論的確率
+        std::vector<double> probs(NUM_ERROR_STATES);
+        probs[ERROR_MATCH] = 0.85;
+        probs[ERROR_INSERTION] = 0.05;
+        probs[ERROR_DELETION] = 0.05; 
+        probs[ERROR_SUBSTITUTION] = 0.05;
+        (*prob_map)[key] = probs;
+        file_errors++;
+      }
     }
   }
   
-  printf("# Dec3: Loaded %d k-mer error probability entries\n", loaded_entries);
-  printf("# Dec3: P(e_{t+1}|e_t, η_{t+1}) table ready for 4D lattice decoding\n");
+  printf("# Dec3: Successfully loaded %d REAL probability entries from DNArSim-main\n", loaded_entries);
+  printf("# Dec3: Used fallback for %d entries\n", file_errors);
+  printf("# Dec3: TRUE P(e_{t+1}|e_t, η_{t+1}) table ready for ultimate decoding!\n");
 }
 
 //================================================================================
@@ -1227,6 +1292,122 @@ double SLFBAdec::GetKmerErrorProb(int prev_error, int next_kmer, int next_error)
     // フォールバック: 対応するエントリがない場合のデフォルト確率
     if(next_error == ERROR_MATCH) return 0.70;
     else return 0.10;
+  }
+}
+
+//================================================================================
+// Dec3究極統合: 動的確率を使った観測確率計算 (CalcPyxの進化版)
+// GetGXの完全な代替として、DNArSim現実確率に基づくCalcPyx動的計算
+//================================================================================
+double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error, int kmer, int codeword_xi) {
+  assert(lx > 0 && ly >= 0);
+  assert(prev_error >= 0 && prev_error < NUM_ERROR_STATES);
+  assert(kmer >= 0 && kmer < num_kmers);
+  assert(codeword_xi >= 0 && codeword_xi < Q);
+
+  // ★ 状態に応じた動的な確率をDNArSim-mainから取得
+  double pi = GetKmerErrorProb(prev_error, kmer, ERROR_INSERTION);
+  double pd = GetKmerErrorProb(prev_error, kmer, ERROR_DELETION);  
+  double ps = GetKmerErrorProb(prev_error, kmer, ERROR_SUBSTITUTION);
+  double pt = 1.0 - pi - pd; // 伝送確率（Match + 実際のSubstitutionを含む）
+
+  // 削除のみの場合
+  if (ly == 0) return pow(pd, lx);
+
+  long x1, y1;
+  double ret, qt, qi, qd;
+  unsigned char *X = new unsigned char[lx];
+  unsigned char *Y = new unsigned char[ly];
+  LongToVect(X, x, lx);
+  LongToVect(Y, y, ly);
+
+  if (lx == 1) {
+    if (ly == 1) {
+      // 1対1の場合：動的psを使ったPsub計算
+      ret = Psub_quaternary(X[0], Y[0], ps) * pt;
+    } else if (ly == 2) {
+      // 1対2の場合：挿入を含む
+      ret = Psub_quaternary(X[0], Y[0], ps) * Psub_quaternary(X[0], Y[1], ps) * pi;
+    } else {
+      // 1対3以上は確率0
+      ret = 0.0;
+    }
+  } else {
+    // 再帰的計算
+    x1 = VectToLong(&X[1], lx - 1);
+    
+    // ✅ 修正：次のk-merは一度だけ計算
+    int next_kmer = ComputeNextKmer(kmer, codeword_xi);
+    // -----伝送 (transmission)
+    qt = Psub_quaternary(X[0], Y[0], ps) * pt;
+    y1 = (ly == 1) ? 0 : VectToLong(&Y[1], ly - 1);
+    qt *= CalcPyx_dynamic(y1, x1, ly - 1, lx - 1, ERROR_MATCH, next_kmer, codeword_xi);
+
+    // -----挿入 (insertion)
+    if (ly < 2) {
+      qi = 0.0;
+    } else {
+      qi = Psub_quaternary(X[0], Y[0], ps) * Psub_quaternary(X[0], Y[1], ps) * pi;
+      y1 = (ly == 2) ? 0 : VectToLong(&Y[2], ly - 2);
+      qi *= CalcPyx_dynamic(y1, x1, ly - 2, lx - 1, ERROR_INSERTION, next_kmer, codeword_xi);
+    }
+
+    // -----削除 (deletion)
+    qd = pd;
+    y1 = y;
+    qd *= CalcPyx_dynamic(y1, x1, ly, lx - 1, ERROR_DELETION, next_kmer, codeword_xi);
+
+    ret = qt + qi + qd;
+  }
+
+  delete[] X;
+  delete[] Y;
+  return ret;
+}
+
+//================================================================================
+// 動的ps対応のPsub_quaternaryオーバーロード
+//================================================================================
+double SLFBAdec::Psub_quaternary(unsigned char a, unsigned char b, double dynamic_ps) {
+  assert(a <= 3 && b <= 3);
+  
+  if (a == b) {
+    // 置換が起こらない確率 (Match)
+    return 1.0 - dynamic_ps; 
+  } else {
+    // aがbに置換される確率
+    return dynamic_ps * SubMatrix[a][b];
+  }
+}
+
+//================================================================================
+// Dec3統合: DNAチャネル統合観測確率計算（CalcPyx_dynamicのラッパー）
+//================================================================================
+double SLFBAdec::ComputeObservationProbabilityFromDNA(int idx, int Nu2, int iL, int xi, int k0, int e0, int Nb2) {
+  // 範囲チェック
+  if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) {
+    return 0.001;
+  }
+  
+  // ★ 真の統合：CalcPyx_dynamicを呼び出してDNArSim現実確率で計算
+  if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+    long y = VectToLong(&Yin[iL], Nu2);
+    
+    // 符号語を取得してlongに変換
+    unsigned char *codeword = new unsigned char[Nu];
+    ICB->Get_CW(codeword, xi);
+    long x = VectToLong(codeword, Nu);
+    
+    // k0, e0情報がある場合はそれを使用、ない場合はデフォルト値
+    int actual_prev_error = (e0 >= 0) ? e0 : ERROR_MATCH;
+    int actual_kmer = (k0 >= 0) ? k0 : 0;
+    
+    double result = CalcPyx_dynamic(y, x, Nu2, Nu, actual_prev_error, actual_kmer, xi);
+    delete[] codeword;
+    return result;
+  } else {
+    // Nu2が範囲外の場合は均等確率
+    return 1.0 / Q;
   }
 }
 
@@ -1386,15 +1567,12 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
           
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
-          // 観測確率計算（符号語別）
+          // ✅ Dec3新方式: DNAチャネル統合動的確率計算
+          // GetGX依存を排除し、実際のDNA配列とk-mer確率のみを使用
           double *s_per_codeword = new double[Q];
           for (int xi = 0; xi < Q; xi++) {
-            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
-              long y = VectToLong(&Yin[iL], Nu2);
-              s_per_codeword[xi] = GetGX(Nu2, y, xi);
-            } else {
-              s_per_codeword[xi] = GetGX(Nu2, 0, 0);
-            }
+            // 実DNA配列から直接観測確率を計算
+            s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
           }
 
           // ✅ Dec3効率化修正：全符号語xiで決定論的k-mer遷移を直接計算
@@ -1445,57 +1623,37 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
 
   // 現在の状態 t の確率を初期化
+  for (int d0 = Dmin; d0 <= Dmax; d0++)
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++)
+      for (int k0 = 0; k0 < num_kmers; k0++)
+        PBE4D[idx][d0-Dmin][e0][k0] = 0.0;
+
+  // ✅ 修正：CalcPFE4Dと同じ効率的なループ構造
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
     for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
       for (int k0 = 0; k0 < num_kmers; k0++) {
-        PBE4D[idx][d0-Dmin][e0][k0] = 0.0;
-      }
-    }
-  }
-  
-  // Dec3決定論的k-mer遷移：4次元後進確率計算
-  for (int d1 = Dmin; d1 <= Dmax; d1++) {
-    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-      for (int k1 = 0; k1 < num_kmers; k1++) {
-        
-        if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
+        for (int d1 = Dmin; d1 <= Dmax; d1++) {
 
-        for (int d0 = Dmin; d0 <= Dmax; d0++) {
-          
-          // チャネルパラメータ計算（CalcPFE4Dと同一）
           int Nu2 = Nu + d1 - d0;
           int iL = idx * Nu + d0;
-          
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
-          double *s_per_codeword = new double[Q];
+          double s_per_codeword[Q];
+          for(int xi=0; xi < Q; xi++) {
+            s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
+          }
+
           for (int xi = 0; xi < Q; xi++) {
-            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
-              long y = VectToLong(&Yin[iL], Nu2);
-              s_per_codeword[xi] = GetGX(Nu2, y, xi);
-            } else {
-              s_per_codeword[xi] = GetGX(Nu2, 0, 0);
+            int k1 = ComputeNextKmer(k0, xi);
+            for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+              if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
+
+              double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
+              double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
+
+              PBE4D[idx][d0-Dmin][e0][k0] += PBE4D[idx+1][d1-Dmin][e1][k1] * gamma_xi;
             }
           }
-          
-          // ✅ Dec3効率化修正：後進でも前進と同じ効率的構造を使用
-          for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
-            for (int k0 = 0; k0 < num_kmers; k0++) {
-              for (int xi = 0; xi < Q; xi++) {
-                int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
-                
-                for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-                  double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
-                  double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
-                  
-                  // 4D後進確率の更新（決定論的遷移により効率的）
-                  PBE4D[idx][d0-Dmin][e0][k0] += PBE4D[idx+1][d1-Dmin][e1][k1] * gamma_xi;
-                }
-              }
-            }
-          }
-          
-          delete[] s_per_codeword;
         }
       }
     }
@@ -1545,13 +1703,8 @@ void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
             int iL = idx * Nu + d0;
             if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
             
-            double obs_prob;
-            if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
-              long y = VectToLong(&Yin[iL], Nu2);
-              obs_prob = GetGX(Nu2, y, xi);
-            } else {
-              obs_prob = GetGX(Nu2, 0, 0);
-            }
+            // ✅ Dec3新方式: DNAチャネル統合動的確率計算（CalcPDE4D用）
+            double obs_prob = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
 
             int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
 
