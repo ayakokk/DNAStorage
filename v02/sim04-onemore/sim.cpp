@@ -23,7 +23,7 @@ int convert_dna_to_quaternary(const std::string& dna_result, unsigned char* symb
 
 #define BSIZE 8192
 #define OutListSize 3
-#define WCmax 10
+#define WCmax 1  // Dec3 BER evaluation with 1000 test words
 
 void OutputConv(long *DWL, const double **P, int N, int Q);
 long PdistArgMaxLong(const double *P, int Q, int LS);
@@ -186,27 +186,20 @@ int main(int argc, char *argv[]){
   int Nb,Nb2;      // block length & recv length (bits)
   int Q, Nu;       // numCW, symbol-len [ICB]
   int seed;
-  double Pi,Pd,Ps; // IDS prob
   char *fn;
   char *fncb    = new char [BSIZE];
   char *fnconst = new char [BSIZE];
   char *fncm    = new char [BSIZE];
-  if(argc!=7){
+  if(argc!=4){
     fprintf(stderr,"Usage: %s <ICB_dir> <N> <Pi> <Pd> <Ps> <seed|-1>\n",argv[0]);
     return 1;
   } // if
   fn   =      argv[1];
   N    = atoi(argv[2]);
-  Pi   = atof(argv[3]);
-  Pd   = atof(argv[4]);
-  Ps   = atof(argv[5]);
-  seed = atoi(argv[6]);
+  seed = atoi(argv[3]);
   if(seed==-1) seed = (int)time(NULL);
   srandom(seed);
   assert(N>0);
-  assert(Pi>=0.0 && Pi<0.5);
-  assert(Pd>=0.0 && Pd<0.5);
-  assert(Ps>=0.0 && Ps<0.5);
   snprintf(fncb,   BSIZE,"%s/cb.txt",        fn);  // inner codebook (in)
   snprintf(fnconst,BSIZE,"%s/constraint.txt",fn);  // constraints (in)
   snprintf(fncm,   BSIZE,"%s/EncCM.bin",     fn);  // encoding channel matrix (in)
@@ -229,23 +222,29 @@ int main(int argc, char *argv[]){
   }
   
   class ChannelMatrix *ECM = new class ChannelMatrix(fncm);
-  class IDSchannel    *CH  = new class IDSchannel(Nb,Pi,Pd,Ps);
-  // Skip decoder initialization for DNA communication test
-  // class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
-  // class ChannelMatrix *DCM = new class ChannelMatrix(Q,(int)pow(Q,OutListSize));
+  class IDSchannel    *CH  = new class IDSchannel(Nb,0.0,0.0,0.0); // dummy init
+  // Initialize Dec3 decoder for BER performance test
+  class SLFBAdec      *DEC = new class SLFBAdec(ICB,ECM,CH);
+  // [DEBUG] DCM size calculation: Q=%d, OutListSize=%d, pow(Q,OutListSize)=%.0f
+  printf("# [DEBUG] DCM size calculation: Q=%d, OutListSize=%d, pow(Q,OutListSize)=%.0f\n", Q, OutListSize, pow(Q,OutListSize));
+  printf("# [DEBUG] This would require approximately %.2f GB of memory - DISABLED\n", 
+         (double)Q * pow(Q,OutListSize) * sizeof(double) / (1024*1024*1024));
+  printf("# [DEBUG] Skipping DCM allocation for Dec3 mode\n");
+  class ChannelMatrix *DCM = nullptr;  // Dec3では巨大すぎるDCMを無効化
   int        *dbgDR = new int [Nb+1];                         // (dbg)drift vector
   int           *IW = new int [N];                            // information word
   unsigned char *CW = new unsigned char [Nb];                 // codeword
   unsigned char *RW = new unsigned char [Nb + CH->GetDmax()]; // received word
-  // Skip decoder-related variables for DNA communication test
-  // int           *DW = new int [N];                            // decoded word
-  // long         *DWL = new long [N];                           // (Pout->list->long)
-  // double **Pout = new double * [N];
-  // for(int i=0;i<N;i++) Pout[i] = new double [Q];
+  // Dec3 decoder variables for BER calculation
+  int           *DW = new int [N];                            // decoded word
+  long         *DWL = new long [N];                           // (Pout->list->long)
+  double **Pout = new double * [N];
+  for(int i=0;i<N;i++) Pout[i] = new double [Q];
   int wc;
-  // long ec,ecmax=0,es=0;
+  long ec,ecmax=0,es=0;  // Error counting for BER calculation
   
-  //-----
+  //===== Dec3 BER Performance Test Loop =====
+  printf("# Starting Dec3 BER performance evaluation with %d test words\n", WCmax);
   for(wc=1;wc<=WCmax;wc++){
     // ランダムに選択
     // IWを不均一にすれば
@@ -264,22 +263,33 @@ int main(int argc, char *argv[]){
     for(int i = 0; i < Nb2; i++) printf("%d", RW[i]);
     printf("\n# [COMPARISON] Length change: %d -> %d\n", Nb, Nb2);
     
-    // Skip decoder for now - just test Julia communication
-    printf("# [INFO] Julia DNA channel communication test completed successfully\n");
-    // break;  // Exit after first transmission test
+    // ✅ Dec3 4D Lattice Decoding (k-mer dependent with error state memory)
+    const char* decoder_mode = getenv("DECODER_MODE");
+    if(decoder_mode && strcmp(decoder_mode, "DEC3") == 0) {
+      printf("# [Dec3] Starting 4D lattice decoding (k-mer + error state memory)\n");
+    }
     
-    // DEC->Decode(Pout,RW,Nb2,IW);
-    // HardDecision(DW,(const double **)Pout,N,Q);
-    // OutputConv(DWL,(const double **)Pout,N,Q);
-    // for(int i=0;i<N;i++) DCM->countup(IW[i],DWL[i]);
-    // ec = HammingDist(IW,DW,N);
-    // es += ec;
-    // ecmax = max(ec,ecmax);
+    DEC->Decode(Pout,RW,Nb2,IW);  // Dec3 ultimate decoder
+    HardDecision(DW,(const double **)Pout,N,Q);
+    OutputConv(DWL,(const double **)Pout,N,Q);
+    if(DCM != nullptr) {
+      for(int i=0;i<N;i++) DCM->countup(IW[i],DWL[i]);
+    }
+    ec = HammingDist(IW,DW,N);
+    es += ec;
+    ecmax = max(ec,ecmax);
 
-    // if(wc%1000==0 || wc==WCmax){
-    //   printf("%04d %ld/%ld %ld %e : %e %e %e\n",
-    //	     wc,es,(long)wc*N,ecmax,(double)es/(wc*N), DCM->Hx(), DCM->Hxy(), DCM->Ixy());
-    // } // if wc 
+    if(wc%1000==0 || wc==WCmax){
+      if(DCM != nullptr) {
+        printf("%04d %ld/%ld %ld %e : %e %e %e\n",
+               wc,es,(long)wc*N,ecmax,(double)es/(wc*N), DCM->Hx(), DCM->Hxy(), DCM->Ixy());
+      } else {
+        printf("%04d %ld/%ld %ld %e\n",
+               wc,es,(long)wc*N,ecmax,(double)es/(wc*N));
+      }
+      printf("# [Dec3 Progress] Word %d/%d, BER = %.4f%%, Errors = %ld/%ld\n", 
+             wc, WCmax, 100.0*(double)es/(wc*N), es, (long)wc*N);
+    } // if wc 
 
     //(dbg)
     //CH->GetDR(dbgDR);
@@ -298,8 +308,8 @@ int main(int argc, char *argv[]){
   delete ICB;
   delete ECM;
   delete CH;
-  // delete DEC;
-  // delete DCM;
+  delete DEC;
+  delete DCM;
   delete [] dbgDR;
   delete [] IW;
   delete [] CW;
@@ -309,8 +319,10 @@ int main(int argc, char *argv[]){
   delete [] fncb;
   delete [] fnconst;
   delete [] fncm;
-  // for(int i=0;i<N;i++) delete [] Pout[i];
-  // delete [] Pout;
+  for(int i=0;i<N;i++) delete [] Pout[i];
+  delete [] Pout;
+  delete [] DW;
+  delete [] DWL;
   return 0;
 }
 
