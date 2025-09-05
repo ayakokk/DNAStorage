@@ -44,7 +44,12 @@ void InnerCodebook::VectInv(unsigned char *VI, const unsigned char *V, int len){
 void InnerCodebook::VectInv4(unsigned char *VI, const unsigned char *V, int len){
   unsigned char *upper = new unsigned char[len];
   unsigned char *upper_inv = new unsigned char[len];
-  
+
+  printf("DEBUG: Data being passed to Extract4toUpper:\n");
+  for (int i=0; i<*upper; ++i) {
+      printf("%d ", upper[i]);
+  }
+  printf("\n");
   // 1. 上位ビット抽出
   Extract4toUpper(upper, V, len);
   
