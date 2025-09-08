@@ -430,7 +430,7 @@ void dbgPrint(const int *IW, const int *DW,
     if(i%Nu==0){
       if(i<Nb){
 	idx = i/Nu;
-	printf("[%03d] %002d %002d\n",idx,IW[idx],DW[idx]);
+	printf("[%03d] %02d %02d\n",idx,IW[idx],DW[idx]);
 	PrintVect(Pout[idx],Q,"","\n");
       } else {
 	printf("[---]\n");
