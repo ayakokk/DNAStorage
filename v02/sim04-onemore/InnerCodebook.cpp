@@ -329,8 +329,27 @@ void InnerCodebook::ReadFile(const char *fn){
   for(long i=0;i<numCW;i++){
     assert(fgets(buf,BSIZE,fp)!=NULL);
     for(int j=0;j<Nu;j++){
-      CW[i][j] = buf[j]-'0';
-      assert(CW[i][j]>=0 && CW[i][j]<=3);  // 4元コードブック対応
+      // CW[i][j] = buf[j]-'0';
+      // assert(CW[i][j]>=0 && CW[i][j]<=3);  // 4元コードブック対応
+      switch(buf[j]) {
+        case 'A': case '0':
+            CW[i][j] = 0;
+            break;
+        case 'C': case '1':
+            CW[i][j] = 1;
+            break;
+        case 'G': case '2':
+            CW[i][j] = 2;
+            break;
+        case 'T': case '3':
+            CW[i][j] = 3;
+            break;
+        default:
+            // 予期せぬ文字(スペース、改行、範囲外の数字など)が来たらエラーとして即座に停止
+            fprintf(stderr, "ERROR in InnerCodebook::ReadFile: Invalid character '%c' (ASCII: %d) found in codebook file.\n", buf[j], buf[j]);
+            assert(false);
+            break;
+      }
     } // for j
     RLmax[i]   = MaxRunLen4(CW[i],   Nu);
     RLleft[i]  = RunLenF4(CW[i],0,   Nu);

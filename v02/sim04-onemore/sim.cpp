@@ -233,8 +233,8 @@ int main(int argc, char *argv[]){
   class ChannelMatrix *DCM = nullptr;  // Dec3では巨大すぎるDCMを無効化
   int        *dbgDR = new int [Nb+1];                         // (dbg)drift vector
   int           *IW = new int [N];                            // information word
-  unsigned char *CW = new unsigned char [Nb];                 // codeword
-  unsigned char *RW = new unsigned char [Nb + CH->GetDmax()]; // received word
+  unsigned char *CW = new unsigned char [Nb]();                 // codeword (zero-initialized)
+  unsigned char *RW = new unsigned char [Nb + CH->GetDmax()](); // received word (zero-initialized)
   // Dec3 decoder variables for BER calculation
   int           *DW = new int [N];                            // decoded word
   long         *DWL = new long [N];                           // (Pout->list->long)

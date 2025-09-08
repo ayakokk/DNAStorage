@@ -5,6 +5,7 @@
 #include <time.h>
 #include <assert.h>
 #include <string>
+#include <vector>
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -192,7 +193,7 @@ void SLFBAdec::SetGX(){
   GX = new double ** [Nu*2+1];
 
   printf("# SetGX: Starting pre-calculation of the GX table. This may take a very long time...\n");
-  
+
   for(int ly=0;ly<=Nu*2;ly++){
     if(ly<Nu2min || ly>Nu2max){
       // approximate
@@ -235,21 +236,23 @@ void SLFBAdec::SetGX(){
       printf("\r  -> Progress: [100.0 %%] ... Done.                     \n");
     } // if ly
   } // for ly
-  
+
   printf("# SetGX: Pre-calculation of the GX table is complete.\n");
   delete [] X;
 }
 
 //================================================================================
 void SLFBAdec::DelGX(){
-  int i2p;
+  int i4p;
   for(int i=0;i<=Nu*2;i++){
     if(i<Nu2min || i>Nu2max){
       delete [] GX[i][0];
       delete [] GX[i];
     } else {
-      i2p = (long)pow(2,i);
-      for(long y=0;y<i2p;y++) delete [] GX[i][y];
+      // i4p = (long)pow(2,i); // <-- 古いコード
+      i4p = 1;                 // ✅ 修正：4^iを計算
+      for(int j=0; j<i; j++) i4p *= 4;
+      for(long y=0; y<i4p; y++) delete [] GX[i][y];
       delete [] GX[i];
     } // if i
   } // for i
@@ -1171,8 +1174,8 @@ int SLFBAdec::ComputeNextKmer(int current_kmer, int codeword_xi) {
   GetKmerFromIndex(current_kmer, current_kmer_seq);
   
   // 符号語xiをbit配列に取得
-  unsigned char codeword[Nu];
-  ICB->Get_CW(codeword, codeword_xi);
+  std::vector<unsigned char> codeword(Nu);
+  ICB->Get_CW(codeword.data(), codeword_xi); // .data()でポインタを取得
   
   // 次のk-mer計算: 左シフト + 新しい塩基追加
   unsigned char next_kmer_seq[KMER_LENGTH];
@@ -1676,7 +1679,7 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
           int iL = idx * Nu + d0;
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
-          double s_per_codeword[Q];
+          std::vector<double> s_per_codeword(Q);
           for(int xi=0; xi < Q; xi++) {
             s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
           }
