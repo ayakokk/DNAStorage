@@ -190,6 +190,9 @@ void SLFBAdec::SetGX(){
   long ly2p,x;
   unsigned char *X = new unsigned char [Nu];
   GX = new double ** [Nu*2+1];
+
+  printf("# SetGX: Starting pre-calculation of the GX table. This may take a very long time...\n");
+  
   for(int ly=0;ly<=Nu*2;ly++){
     if(ly<Nu2min || ly>Nu2max){
       // approximate
@@ -202,8 +205,22 @@ void SLFBAdec::SetGX(){
       // ly2p = (long)pow(2,ly);
       ly2p = 1;          // ✅ 修正：4^lyを計算
       for(int i=0; i<ly; i++) ly2p *= 4;
+
+      // ▼▼▼ 進捗表示：ステップA (どの `ly` を処理中か表示) ▼▼▼
+      printf("# SetGX: Processing received length ly = %d (y has %ld patterns)...\n", ly, ly2p);
+      fflush(stdout); // バッファを強制的に出力して、メッセージをすぐに表示させる
+
       GX[ly] = new double * [ly2p];
       for(long y=0;y<ly2p;y++){
+
+        // ▼▼▼ 進捗表示：ステップB (パーセンテージ表示) ▼▼▼
+        // 計算回数が多い場合のみ、約1%ごとに進捗を表示する
+        if (ly2p > 1000 && y % (ly2p / 100) == 0) {
+            double percent = (double)y / ly2p * 100.0;
+            printf("\r  -> Progress: [%.1f %%]", percent); // \r でカーソルを行頭に戻す
+            fflush(stdout); // バッファを強制的に出力
+        }
+
         GX[ly][y] = new double [Q];
         for(int xi=0;xi<Q;xi++){
           ICB->Get_CW(X,xi);
@@ -214,8 +231,12 @@ void SLFBAdec::SetGX(){
           //PrintVect(X,Nu,"X=","\n");
         } // for x
       } // for y
+      // ▼▼▼ 進捗表示：ステップC (完了表示) ▼▼▼
+      printf("\r  -> Progress: [100.0 %%] ... Done.                     \n");
     } // if ly
   } // for ly
+  
+  printf("# SetGX: Pre-calculation of the GX table is complete.\n");
   delete [] X;
 }
 
@@ -602,6 +623,8 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
   } else if (strcmp(decoder_mode, "DEC3") == 0) {
     printf("# Using Dec3 4D lattice decoder with k-mer dependency (ultimate decoder)\n");
+    // ✅ メモ化：新しいデコードの開始前にキャッシュをクリア
+    pyx_cache.clear();
     InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
     for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
@@ -1304,6 +1327,16 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
   assert(prev_error >= 0 && prev_error < NUM_ERROR_STATES);
   assert(kmer >= 0 && kmer < num_kmers);
   assert(codeword_xi >= 0 && codeword_xi < Q);
+  // ▼▼▼ メモ化：ステップA（キャッシュ確認） ▼▼▼
+  // 1. 現在の引数の組み合わせをキーとして作成
+  std::tuple<long, long, int, int, int, int, int> key = 
+      std::make_tuple(y, x, ly, lx, prev_error, kmer, codeword_xi);
+
+  // 2. キャッシュにキーが存在するか確認
+  if (pyx_cache.count(key)) {
+      return pyx_cache[key]; // 存在すれば、計算せずにすぐに結果を返す
+  }
+  // ▲▲▲ メモ化：ステップAここまで ▲▲▲
 
   // ★ 状態に応じた動的な確率をDNArSim-mainから取得
   double pi = GetKmerErrorProb(prev_error, kmer, ERROR_INSERTION);
@@ -1362,7 +1395,12 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
 
   delete[] X;
   delete[] Y;
+  
+  // ▼▼▼ メモ化：ステップB（結果を保存） ▼▼▼
+  // 3. 計算結果をキャッシュに保存してから返す
+  pyx_cache[key] = ret;
   return ret;
+  // ▲▲▲ メモ化：ステップBここまで ▲▲▲
 }
 
 //================================================================================

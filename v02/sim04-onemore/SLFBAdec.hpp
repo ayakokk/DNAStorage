@@ -1,3 +1,4 @@
+#include <map>
 class SLFBAdec {
 private:
   // エラー状態定数
@@ -96,6 +97,10 @@ private:
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
   void CalcPBE4D(int idx, int Nb2);    // 4次元後進確率計算
   void CalcPDE4D(int idx, int Nb2);    // 4次元事後確率計算
+  // ✅ CalcPxy_dynamicの計算結果をキャッシュするマップ
+  // キー: <y, x, ly, lx, prev_e, kmer, xi> の組み合わせ
+  // 値: 計算結果のdouble値
+  std::map<std::tuple<long, long, int, int, int, int, int>, double> pyx_cache;
 public:
   SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class IDSchannel *_CH);
   ~SLFBAdec();
@@ -107,4 +112,5 @@ public:
   void exportGDTable(const char* filename);
   void exportGXTable(const char* filename);
   void exportAllTables(const char* output_dir);
+ 
 };
