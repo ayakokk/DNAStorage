@@ -1,32 +1,45 @@
-all: func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o CBsearch GenEncCM sim test_tables
+# C++コンパイラを指定
+CXX = g++
+# コンパイルフラグを指定 (-O3を外し、デバッグとAddress Sanitizerを追加)
+CXXFLAGS = -Wall -g -fsanitize=address -std=c++11
+
+# 最終的に生成する実行ファイルを指定
+TARGETS = CBsearch GenEncCM sim test_tables
+
+# 'make' とだけ打った時に 'all' が実行される
+all: $(TARGETS)
+
+# オブジェクトファイルの依存関係
+OBJS = func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o
 
 func.o: func.cpp func.hpp Makefile
-	g++ -Wall -O3 -c -o func.o func.cpp
+	$(CXX) $(CXXFLAGS) -c -o func.o func.cpp
 
 ChannelMatrix.o: ChannelMatrix.cpp ChannelMatrix.hpp Makefile
-	g++ -Wall -O3 -c -o ChannelMatrix.o ChannelMatrix.cpp
+	$(CXX) $(CXXFLAGS) -c -o ChannelMatrix.o ChannelMatrix.cpp
 
 InnerCodebook.o: InnerCodebook.cpp InnerCodebook.hpp Makefile
-	g++ -Wall -O3 -c -o InnerCodebook.o InnerCodebook.cpp
+	$(CXX) $(CXXFLAGS) -c -o InnerCodebook.o InnerCodebook.cpp
 
 IDSchannel.o: IDSchannel.cpp IDSchannel.hpp Makefile
-	g++ -Wall -O3 -c -o IDSchannel.o IDSchannel.cpp
+	$(CXX) $(CXXFLAGS) -c -o IDSchannel.o IDSchannel.cpp
 
 SLFBAdec.o: SLFBAdec.cpp SLFBAdec.hpp InnerCodebook.hpp ChannelMatrix.hpp IDSchannel.hpp Makefile
-	g++ -Wall -O3 -c -o SLFBAdec.o SLFBAdec.cpp
+	$(CXX) $(CXXFLAGS) -c -o SLFBAdec.o SLFBAdec.cpp
 
+# 実行ファイルの生成ルール
 CBsearch: CBsearch.cpp func.o Makefile
-	g++ -Wall -O3 -o CBsearch func.o CBsearch.cpp
+	$(CXX) $(CXXFLAGS) -o CBsearch func.o CBsearch.cpp
 
 GenEncCM: GenEncCM.cpp func.o ChannelMatrix.o InnerCodebook.o Makefile
-	g++ -Wall -O3 -o GenEncCM func.o ChannelMatrix.o InnerCodebook.o GenEncCM.cpp
+	$(CXX) $(CXXFLAGS) -o GenEncCM func.o ChannelMatrix.o InnerCodebook.o GenEncCM.cpp
 
-sim: sim.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
-	g++ -Wall -O3 -o sim func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o sim.cpp
+sim: sim.cpp $(OBJS) Makefile
+	$(CXX) $(CXXFLAGS) -o sim $(OBJS) sim.cpp
 
-test_tables: test_tables.cpp func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o Makefile
-	g++ -Wall -O3 -o test_tables func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o test_tables.cpp
+test_tables: test_tables.cpp $(OBJS) Makefile
+	$(CXX) $(CXXFLAGS) -o test_tables $(OBJS) test_tables.cpp
 
+# クリーンアップルール
 clean:
-	rm -f CBsearch GenEncCM sim test_tables *.o
-
+	rm -f $(TARGETS) *.o
