@@ -1380,12 +1380,11 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
     // ✅ 修正：次のk-merは一度だけ計算
     int next_kmer = ComputeNextKmer(kmer, codeword_xi);
     // -----伝送 (transmission)
-    double qt = Psub_quaternary(X[0], Y[0], ps) * pt;
+    qt = Psub_quaternary(X[0], Y[0], ps) * pt;
     y1 = (ly == 1) ? 0 : VectToLong(&Y[1], ly - 1);
     qt *= CalcPyx_dynamic(y1, x1, ly - 1, lx - 1, ERROR_MATCH, next_kmer, codeword_xi);
 
     // -----挿入 (insertion)
-    double qi;
     if (ly < 2) {
       qi = 0.0;
     } else {
@@ -1395,7 +1394,7 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
     }
 
     // -----削除 (deletion)
-    double qd = pd;
+    qd = pd;
     y1 = y;
     qd *= CalcPyx_dynamic(y1, x1, ly, lx - 1, ERROR_DELETION, next_kmer, codeword_xi);
 
