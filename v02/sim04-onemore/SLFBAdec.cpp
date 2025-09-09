@@ -1348,14 +1348,19 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
   double pt = 1.0 - pi - pd; // 伝送確率（Match + 実際のSubstitutionを含む）
 
   // 削除のみの場合
-  if (ly == 0) return pow(pd, lx);
-
+  if (ly == 0) {
+      double result = pow(pd, lx);
+      pyx_cache[key] = result; // キャッシュに保存
+      return result;
+  }
   long x1, y1;
   double ret, qt, qi, qd;
-  unsigned char *X = new unsigned char[lx];
-  unsigned char *Y = new unsigned char[ly];
-  LongToVect(X, x, lx);
-  LongToVect(Y, y, ly);
+
+  // ✅ 修正：new/deleteの代わりにstd::vectorを使い、メモリリークを根絶
+  std::vector<unsigned char> X(lx);
+  std::vector<unsigned char> Y(ly);
+  LongToVect(X.data(), x, lx);
+  LongToVect(Y.data(), y, ly);
 
   if (lx == 1) {
     if (ly == 1) {
@@ -1363,7 +1368,7 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
       ret = Psub_quaternary(X[0], Y[0], ps) * pt;
     } else if (ly == 2) {
       // 1対2の場合：挿入を含む
-      ret = Psub_quaternary(X[0], Y[0], ps) * Psub_quaternary(X[0], Y[1], ps) * pi;
+      ret = Psub_quaternary(X[0], Y[0], ps) * Psub_quaternary(X[0], Y[1], ps)  * pi;
     } else {
       // 1対3以上は確率0
       ret = 0.0;
@@ -1375,11 +1380,12 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
     // ✅ 修正：次のk-merは一度だけ計算
     int next_kmer = ComputeNextKmer(kmer, codeword_xi);
     // -----伝送 (transmission)
-    qt = Psub_quaternary(X[0], Y[0], ps) * pt;
+    double qt = Psub_quaternary(X[0], Y[0], ps) * pt;
     y1 = (ly == 1) ? 0 : VectToLong(&Y[1], ly - 1);
     qt *= CalcPyx_dynamic(y1, x1, ly - 1, lx - 1, ERROR_MATCH, next_kmer, codeword_xi);
 
     // -----挿入 (insertion)
+    double qi;
     if (ly < 2) {
       qi = 0.0;
     } else {
@@ -1389,16 +1395,13 @@ double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error,
     }
 
     // -----削除 (deletion)
-    qd = pd;
+    double qd = pd;
     y1 = y;
     qd *= CalcPyx_dynamic(y1, x1, ly, lx - 1, ERROR_DELETION, next_kmer, codeword_xi);
 
     ret = qt + qi + qd;
   }
 
-  delete[] X;
-  delete[] Y;
-  
   // ▼▼▼ メモ化：ステップB（結果を保存） ▼▼▼
   // 3. 計算結果をキャッシュに保存してから返す
   pyx_cache[key] = ret;
@@ -1754,6 +1757,8 @@ void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
               double posterior_contrib = PFE4D[idx][d0-Dmin][e0][k0] * obs_prob * PU[idx][xi] * kmer_error_prob * PBE4D[idx+1][d1-Dmin][e1][k1];
               
               PD[idx][xi] += posterior_contrib;
+              printf("# Debug: idx=%d, xi=%d, d0=%d, e0=%d, k0=%d, d1=%d, e1=%d, k1=%d, contrib=%.6e\n", 
+                     idx, xi, d0, e0, k0, d1, e1, k1, posterior_contrib);
             }
           }
         }

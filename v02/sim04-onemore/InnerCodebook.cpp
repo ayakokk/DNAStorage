@@ -622,14 +622,14 @@ int InnerCodebook::CWindex(const unsigned char *V){
 void InnerCodebook::PrintCodebook(){
   int w=10, cnt;
   printf("# CW\n");
-  for(long i=0;i<numCW;i++){
-    printf("# %03ld:",i);
-    PrintVect(CW[i],Nu,""," ");
-    printf("(%d,L%d,R%d) ",RLmax[i],RLleft[i],RLright[i]);
-    PrintVect(Wleft[i], Nu,"WL:"," ");
-    PrintVect(Wright[i],Nu,"WR:"," ");
-    printf("\n");
-  } // for i
+  // for(long i=0;i<numCW;i++){
+  //   printf("# %03ld:",i);
+  //   PrintVect(CW[i],Nu,""," ");
+  //   printf("(%d,L%d,R%d) ",RLmax[i],RLleft[i],RLright[i]);
+  //   PrintVect(Wleft[i], Nu,"WL:"," ");
+  //   PrintVect(Wright[i],Nu,"WR:"," ");
+  //   printf("\n");
+  // } // for i
   printf("# CWL\n");
   cnt = 0;
   for(long i=0;i<Nu2p;i++){
