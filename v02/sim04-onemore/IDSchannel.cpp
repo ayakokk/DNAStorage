@@ -32,7 +32,7 @@ IDSchannel::IDSchannel(int _N, double _Pi, double _Pd, double _Ps){
   // Dmin = (int)floor(-(double)Drange*N*Pd);
   // Dmax = (int)ceil ( (double)Drange*N*Pi);
   Dmin = -N;
-  Dmax = N/6 * 2;
+  Dmax = N * 2;
   printf("# IDSchannel: N=%d (Pi,Pd,Ps)=(%e,%e,%e) (Dmin,Dmax)=(%d,%d)\n",N,Pi,Pd,Ps,Dmin,Dmax);
   assert( N>0 );
   assert( Pi>=0.0 && Pi<0.5 );
