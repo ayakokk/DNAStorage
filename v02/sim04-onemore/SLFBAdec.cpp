@@ -1664,6 +1664,10 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
 //================================================================================
 void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
+  printf("# Dec3: CalcPBE4D[%d] starting...\n", idx);
+  fflush(stdout);
+
+
 
   // 現在の状態 t の確率を初期化
   for (int d0 = Dmin; d0 <= Dmax; d0++)
@@ -1673,6 +1677,11 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
 
   // ✅ 修正：CalcPFE4Dと同じ効率的なループ構造
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    // ▼▼▼ デバッグ表示2：最も重いループの進捗をパーセント表示 ▼▼▼
+    double percent = (double)(d0 - Dmin + 1) / Drng * 100.0;
+    printf("\r  -> Inner Progress (PBE): [%.1f %%]", percent);
+    fflush(stdout);
+
     for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
       for (int k0 = 0; k0 < num_kmers; k0++) {
         for (int d1 = Dmin; d1 <= Dmax; d1++) {
@@ -1701,6 +1710,8 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
       }
     }
   }
+  printf("\r  -> Inner Progress (PBE): [100.0 %%] ... Done.\n");
+
 
   // 4次元正規化
   double total_sum = 0.0;
