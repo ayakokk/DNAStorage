@@ -224,8 +224,17 @@ void SLFBAdec::SetGD(){
 
 //================================================================================
 void SLFBAdec::DelGD(){
-  for(int i=0;i<Drng;i++) delete [] GD[i];
-  delete [] GD;
+  // ✅ 修正: GDがNULLでない場合にのみ解放処理を行う
+  if (GD != NULL) {
+    for(int i=0;i<Drng;i++) {
+      if (GD[i] != NULL) { // 各行もNULLチェック
+        delete[] GD[i];
+        GD[i] = NULL; // 解放後にNULLに設定
+      }
+    }
+    delete[] GD;
+    GD = NULL; // 解放後にNULLに設定
+  }
 }
 
 //================================================================================
