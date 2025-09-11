@@ -1,3 +1,31 @@
+/*
+================================================================================
+SLFBAdec.cpp - Sequential List Forward-Backward Algorithm Decoder
+================================================================================
+DNA データストレージシステム用の制約符号デコーダー実装
+
+【主要機能】
+1. k-mer コンテキスト依存エラー確率に基づくデコーディング
+2. Julia DNA シミュレーター(DNArSim-main)との完全統合
+3. 動的プログラミングによる観測確率計算(CalcPyx_dynamic)
+4. 前進後進アルゴリズムによる最適デコーディング
+5. 4次元状態空間での高精度確率計算
+
+【システム構成】
+- InnerCodebook: 制約符号帳管理
+- ChannelMatrix: チャネル行列と相互情報量計算
+- IDSchannel: IDS(挿入-削除-置換)チャネルモデル
+- DNArSim-main: 現実的なナノポアシーケンシングエラー統計
+
+【技術特徴】
+- MinION R9.4 + Guppy v5.0.7 ベースのエラーモデル
+- k-mer 依存遷移確率 P(e_{t+1}|e_t,η_{t+1})
+- メモ化による高速化(pyx_cache)
+- 4次元前進後進確率計算(Match, Insertion, Deletion, Substitution)
+
+================================================================================
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,9 +43,15 @@
 #define NuMax 10
 
 //================================================================================
+// 基本ユーティリティ関数
+//================================================================================
 int SLFBAdec::max(int a, int b){return (a>b)? a : b;}
 int SLFBAdec::min(int a, int b){return (a<b)? a : b;}
 
+//================================================================================
+// バイナリシンボルの置換確率計算（従来版）
+// a, b: 0 または 1 のバイナリシンボル
+// 戻り値: P(観測=b | 送信=a)
 //================================================================================
 double SLFBAdec::Psub(unsigned char a, unsigned char b){
   assert( a==0 || a==1 );
@@ -26,7 +60,10 @@ double SLFBAdec::Psub(unsigned char a, unsigned char b){
 }
 
 //================================================================================
-// 4値シンボルの置換確率を計算 (論文Table 2対応)
+// DNAシンボル(4値)の置換確率を計算 (論文Table 2対応)
+// a, b: 0=A, 1=C, 2=G, 3=T の4値DNAシンボル
+// 戻り値: P(観測=b | 送信=a) 
+// SubMatrix: 4x4置換行列（各DNA塩基間の遷移確率）
 //================================================================================
 double SLFBAdec::Psub_quaternary(unsigned char a, unsigned char b) {
   assert(a <= 3 && b <= 3);
@@ -41,6 +78,11 @@ double SLFBAdec::Psub_quaternary(unsigned char a, unsigned char b) {
   }
 }
 
+//================================================================================
+// 行列操作ユーティリティ関数群
+// ClearMat: 行列をゼロクリア
+// CopyMat: 行列をコピー
+// MultMat: 行列の乗算
 //================================================================================
 void SLFBAdec::ClearMat(double **X, int M0, int N0){
   for(int i=0;i<M0;i++){
@@ -259,6 +301,13 @@ void SLFBAdec::DelGX(){
   delete [] GX;
 }
 
+//================================================================================
+// 観測確率計算の核心関数（従来版）
+// P(y|x) を動的プログラミングで計算
+// y: 観測配列（longエンコード）, x: 符号語（longエンコード）
+// ly: 観測長, lx: 符号語長
+// 戻り値: P(観測配列y | 送信配列x)
+// 注意：CalcPyx_dynamicに置き換えられた
 //================================================================================
 double SLFBAdec::CalcPyx(long y, long x, int ly, int lx){
   assert(lx>0 && ly>=0);
@@ -1193,6 +1242,80 @@ int SLFBAdec::ComputeNextKmer(int current_kmer, int codeword_xi) {
   return GetKmerIndex(next_kmer_seq);
 }
 
+
+// 拡張k-mer計算（複数符号語を考慮）
+int SLFBAdec::ComputeExtendedKmer(int current_kmer, int xi_current, 
+                                   int xi_next, int idx) {
+  // 現在のk-merから過去の符号語系列を復元
+  unsigned char kmer_seq[KMER_LENGTH];
+  GetKmerFromIndex(current_kmer, kmer_seq);
+  
+  // 現在と次の符号語を取得
+    // 動的配列を使用
+  unsigned char *cw_current = new unsigned char[Nu];
+  unsigned char *cw_next = new unsigned char[Nu];
+  ICB->Get_CW(cw_current, xi_current);
+  ICB->Get_CW(cw_next, xi_next);
+  
+  // 論文の式に従い、k/v個の過去の符号語と現在・次の符号語を結合
+  // ここでは簡略化のため、最新2つの符号語のみを使用
+  unsigned char new_kmer_seq[KMER_LENGTH];
+  
+  // k-mer更新ロジック（v=6, k=4の場合）
+  // 最新の符号語情報でk-merを更新
+  for(int i = 0; i < KMER_LENGTH-2; i++) {
+    new_kmer_seq[i] = kmer_seq[i+2];
+  }
+  new_kmer_seq[KMER_LENGTH-2] = cw_current[0]; // φ₀(u'_i)の先頭
+  new_kmer_seq[KMER_LENGTH-1] = cw_next[0];    // φ₀(u'_(i+1))の先頭
+  
+  return GetKmerIndex(new_kmer_seq);
+}
+
+// 拡張エラー確率（複数符号語コンテキスト対応）
+double SLFBAdec::GetExtendedKmerErrorProb(int prev_error, int prev_kmer,
+                                          int xi_current, int xi_next, 
+                                          int next_error) {
+  // 拡張k-merを計算
+  int extended_kmer = ComputeExtendedKmer(prev_kmer, xi_current, xi_next, 0);
+  
+  // DNArSim-mainの確率テーブルから取得
+  return GetKmerErrorProb(prev_error, extended_kmer, next_error);
+}
+
+// ComputeExtendedObservationProbability関数の実装を追加
+double SLFBAdec::ComputeExtendedObservationProbability(
+    int idx, int Nu2, int iL, int xi_current, int xi_next, 
+    int k0, int e0, int Nb2) {
+  
+  // 範囲チェック
+  if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) {
+    return 0.001;
+  }
+  
+  // 観測配列を取得
+  if (Nu2 >= Nu2min && Nu2 <= Nu2max) {
+    long y = VectToLong(&Yin[iL], Nu2);
+    
+    // 現在の符号語を取得
+    unsigned char *codeword = new unsigned char[Nu];
+    ICB->Get_CW(codeword, xi_current);
+    long x = VectToLong(codeword, Nu);
+    
+    // 拡張k-merを計算
+    int extended_kmer = ComputeExtendedKmer(k0, xi_current, xi_next, idx);
+    
+    // 動的確率計算（拡張版を使用）
+    double result = CalcPyx_dynamic(y, x, Nu2, Nu, e0, extended_kmer, xi_current);
+    
+    delete[] codeword;
+    return result;
+  } else {
+    return 1.0 / Q;
+  }
+}
+
+
 //================================================================================
 void SLFBAdec::LoadKmerErrorProbabilities(const char* dir_path) {
   // std::mapを動的に作成
@@ -1301,6 +1424,12 @@ void SLFBAdec::LoadKmerErrorProbabilities(const char* dir_path) {
 }
 
 //================================================================================
+// k-mer依存エラー確率の取得関数
+// DNArSim-mainから読み込んだ確率テーブルP(e_{t+1}|e_t,η_{t+1})を参照
+// prev_error: 直前のエラー状態, next_kmer: 次のk-merインデックス
+// next_error: 次のエラー状態
+// 戻り値: 条件付き確率 P(next_error | prev_error, next_kmer)
+//================================================================================
 double SLFBAdec::GetKmerErrorProb(int prev_error, int next_kmer, int next_error) {
   assert(prev_error >= 0 && prev_error < NUM_ERROR_STATES);
   assert(next_kmer >= 0 && next_kmer < num_kmers);
@@ -1322,8 +1451,17 @@ double SLFBAdec::GetKmerErrorProb(int prev_error, int next_kmer, int next_error)
 }
 
 //================================================================================
-// Dec3究極統合: 動的確率を使った観測確率計算 (CalcPyxの進化版)
-// GetGXの完全な代替として、DNArSim現実確率に基づくCalcPyx動的計算
+// 【最重要】動的観測確率計算関数（Dec3究極統合版）
+// Julia DNArSim-mainの現実的エラー確率に基づくP(y|x)計算
+// 従来のCalcPyx()とGetGX()を統合し、k-mer依存確率で高精度計算
+// 
+// 引数:
+//   y: 観測配列（longエンコード）, x: 符号語（longエンコード）
+//   ly: 観測長, lx: 符号語長
+//   prev_error: 直前のエラー状態, kmer: k-merコンテキスト
+//   codeword_xi: 符号語インデックス
+// 戻り値: P(y|x,prev_error,kmer) - 現実的DNA確率
+// 特徴: メモ化、再帰的DP、3分岐（伝送・挿入・削除）
 //================================================================================
 double SLFBAdec::CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error, int kmer, int codeword_xi) {
   assert(lx > 0 && ly >= 0);
@@ -1578,9 +1716,11 @@ void SLFBAdec::InitFGE4D(const unsigned char *RW, const double **Pin, int Nb2) {
 }
 
 //================================================================================
-// Dec3核心：4次元前進確率計算 CalcPFE4D
-// 状態: (d_t, e_t, η_t) → (d_{t+1}, e_{t+1}, η_{t+1})
-// 遷移確率: P(e_{t+1}|e_t, η_{t+1}) を使用
+// 【核心】4次元前進確率計算 - 前進後進アルゴリズムの前進ステップ
+// 状態空間: (ドリフト d, エラー e, k-mer η) の4次元格子
+// 計算: P_F(d_{t+1}, e_{t+1}, η_{t+1}) = Σ P_F(d_t, e_t, η_t) × 遷移確率
+// 遷移確率: P(e_{t+1}|e_t, η_{t+1}) - DNArSim-main由来の現実確率
+// 観測確率: ComputeObservationProbabilityFromDNA() - CalcPyx_dynamic使用
 //================================================================================
 void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
@@ -1594,44 +1734,88 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
     }
   }
   
-  // 4次元状態遷移：全ての (d0,e0,k0) → (d1,e1,k1) を計算
+  // // 4次元状態遷移：全ての (d0,e0,k0) → (d1,e1,k1) を計算
+  // for (int d0 = Dmin; d0 <= Dmax; d0++) {
+  //   for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+  //     for (int k0 = 0; k0 < num_kmers; k0++) {
+        
+  //       // 現在の状態への確率が0なら、このパスからの寄与はない
+  //       if (PFE4D[idx][d0-Dmin][e0][k0] == 0.0) continue;
+
+  //       for (int d1 = Dmin; d1 <= Dmax; d1++) {
+          
+  //         // チャネルパラメータ計算
+  //         int Nu2 = Nu + d1 - d0;
+  //         int iL = idx * Nu + d0;
+          
+  //         if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+  //         // ✅ Dec3新方式: DNAチャネル統合動的確率計算
+  //         // GetGX依存を排除し、実際のDNA配列とk-mer確率のみを使用
+  //         double *s_per_codeword = new double[Q];
+  //         for (int xi = 0; xi < Q; xi++) {
+  //           // 実DNA配列から直接観測確率を計算
+  //           s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
+  //         }
+
+  //         // ✅ Dec3効率化修正：全符号語xiで決定論的k-mer遷移を直接計算
+  //         for (int xi = 0; xi < Q; xi++) {
+  //           int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
+
+  //           for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+  //             double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
+  //             double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
+              
+  //             // 4D前進確率の更新（符号語xiによって決まるk1状態に蓄積）
+  //             PFE4D[idx+1][d1-Dmin][e1][k1] += PFE4D[idx][d0-Dmin][e0][k0] * gamma_xi;
+  //           }
+  //         }
+          
+  //         delete[] s_per_codeword;
+  //       }
+  //     }
+  //   }
+  // }
+    // 4次元状態遷移
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
     for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
       for (int k0 = 0; k0 < num_kmers; k0++) {
         
-        // 現在の状態への確率が0なら、このパスからの寄与はない
         if (PFE4D[idx][d0-Dmin][e0][k0] == 0.0) continue;
 
         for (int d1 = Dmin; d1 <= Dmax; d1++) {
           
-          // チャネルパラメータ計算
           int Nu2 = Nu + d1 - d0;
           int iL = idx * Nu + d0;
           
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
-          // ✅ Dec3新方式: DNAチャネル統合動的確率計算
-          // GetGX依存を排除し、実際のDNA配列とk-mer確率のみを使用
-          double *s_per_codeword = new double[Q];
-          for (int xi = 0; xi < Q; xi++) {
-            // 実DNA配列から直接観測確率を計算
-            s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
-          }
-
-          // ✅ Dec3効率化修正：全符号語xiで決定論的k-mer遷移を直接計算
-          for (int xi = 0; xi < Q; xi++) {
-            int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
-
-            for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-              double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
-              double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
+          // 修正点：次の符号語も考慮したk-mer遷移の計算
+          for (int xi = 0; xi < Q; xi++) {      // 現在の符号語 φ₀(u'_i)
+            for (int xi_next = 0; xi_next < Q; xi_next++) {  // 次の符号語 φ₀(u'_(i+1))
               
-              // 4D前進確率の更新（符号語xiによって決まるk1状態に蓄積）
-              PFE4D[idx+1][d1-Dmin][e1][k1] += PFE4D[idx][d0-Dmin][e0][k0] * gamma_xi;
+              // k-merコンテキストの構築（複数符号語を考慮）
+              int k1 = ComputeExtendedKmer(k0, xi, xi_next, idx);
+              
+              // 観測確率（現在と次の両方の符号語を考慮）
+              double obs_prob = ComputeExtendedObservationProbability(
+                idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+              
+              for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+                // 拡張されたk-merコンテキストでのエラー確率
+                double kmer_error_prob = GetExtendedKmerErrorProb(
+                  e0, k0, xi, xi_next, e1);
+                
+                // 次の符号語の事前確率も考慮
+                double gamma = obs_prob * PU[idx][xi] * 
+                              (idx+1 < Ns ? PU[idx+1][xi_next] : 1.0/Q) * 
+                              kmer_error_prob;
+                
+                PFE4D[idx+1][d1-Dmin][e1][k1] += 
+                  PFE4D[idx][d0-Dmin][e0][k0] * gamma;
+              }
             }
           }
-          
-          delete[] s_per_codeword;
         }
       }
     }
@@ -1660,7 +1844,9 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
 }
 
 //================================================================================
-// Dec3核心：4次元後進確率計算 CalcPBE4D
+// 【核心】4次元後進確率計算 - 前進後進アルゴリズムの後進ステップ
+// 逆方向に状態確率を伝播: P_B(d_t, e_t, η_t) = Σ P_B(d_{t+1}, e_{t+1}, η_{t+1}) × 遷移確率
+// 時刻を逆行して最適な復号確率を計算
 //================================================================================
 void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
@@ -1736,8 +1922,10 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
 }
 
 //================================================================================
-// Dec3核心：4次元事後確率計算 CalcPDE4D
-// 4次元前進・後進確率を使って符号語の事後確率を計算
+// 【最終段階】4次元事後確率計算 - 最適復号のための確率統合
+// 前進確率 × 後進確率 = 事後確率
+// P_D(x_t | y_0^T) = P_F(d_t, e_t, η_t) × P_B(d_t, e_t, η_t)
+// 全符号語について最適解を選択
 //================================================================================
 void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);

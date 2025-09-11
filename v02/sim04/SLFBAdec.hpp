@@ -22,6 +22,11 @@ private:
   double **PU, **PD;    // [Ns][Q]:      FG up/down
   double **PI, **PO;    // [Ns][Q]:      FG input/output
   unsigned char *Yin;   // [Nb+Dmax]: received word
+  // k-mer窓の管理（論文の⌊k/v⌋に対応）
+  int kmer_window_size;  // = ⌊k/v⌋ + 2 (現在と次の符号語を含む)
+  
+  // 複数時刻の符号語を保持するバッファ
+  int* codeword_history;  // [kmer_window_size]: 過去の符号語インデックス
   
   // エラー状態関連データ構造 (3D)
   double ***PFE, ***PBE; // [Ns+1][Drng][NUM_ERROR_STATES]: エラー状態を含む前進/後進確率
@@ -97,6 +102,15 @@ private:
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
   void CalcPBE4D(int idx, int Nb2);    // 4次元後進確率計算
   void CalcPDE4D(int idx, int Nb2);    // 4次元事後確率計算
+  // 拡張k-mer関連の新しい関数（複数符号語対応）
+  int ComputeExtendedKmer(int current_kmer, int xi_current, int xi_next, int idx);
+  double GetExtendedKmerErrorProb(int prev_error, int prev_kmer, int xi_current, int xi_next, int next_error);
+  double ComputeExtendedObservationProbability(int idx, int Nu2, int iL, int xi_current, int xi_next, int k0, int e0, int Nb2);
+  
+  // 複数符号語系列を考慮した観測確率計算
+  double CalcPyx_dynamic_extended(long y, long x, int ly, int lx, int prev_error, int kmer, int xi_current, int xi_next);
+  
+
   // ✅ CalcPxy_dynamicの計算結果をキャッシュするマップ
   // キー: <y, x, ly, lx, prev_e, kmer, xi> の組み合わせ
   // 値: 計算結果のdouble値
