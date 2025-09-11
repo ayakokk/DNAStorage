@@ -180,6 +180,10 @@ DNAChannelServer* g_dna_server = nullptr;
 
 //================================================================================
 int main(int argc, char *argv[]){
+  // 標準出力のバッファリングを無効にする（常に即時フラッシュ）
+  setvbuf(stdout, NULL, _IONBF, 0); 
+  // 標準エラー出力も同様に
+  setvbuf(stderr, NULL, _IONBF, 0);
   int Rho;         // run-length    [constraint.txt]
   int ell,Delta;   // local-balance [constraint.txt]
   int N;           // block length (symbols)
