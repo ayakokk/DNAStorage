@@ -264,7 +264,9 @@ int main(int argc, char *argv[]){
     printf("\n# [COMPARISON] Length change: %d -> %d\n", Nb, Nb2);
     
     // ✅ Dec3 4D Lattice Decoding (k-mer dependent with error state memory)
-    const char* decoder_mode = getenv("DECODER_MODE");
+    // const char* decoder_mode = getenv("DECODER_MODE");
+    const char* decoder_mode = "DEC3"; // Forcing Dec3 mode for this test
+
     if(decoder_mode && strcmp(decoder_mode, "DEC3") == 0) {
       printf("# [Dec3] Starting 4D lattice decoding (k-mer + error state memory)\n");
     }
