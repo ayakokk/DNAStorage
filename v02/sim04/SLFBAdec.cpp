@@ -745,10 +745,10 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     for(idx=0;   idx<Ns;idx++) CalcPosterior(idx,Nb2);      // 縦方向事後確率計算
 
     // 【比較用】既存4次元アプローチ（並行実行で性能比較）
-    printf("# Dec3: Starting traditional 4D approach for comparison\n");
-    for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
-    for(idx=Ns-1;idx>=0;idx--) CalcPBE4D(idx,Nb2);   // 4D後進確率
-    for(idx=0;   idx<Ns;idx++) CalcPDE4D(idx,Nb2);   // 4D事後確率
+    // printf("# Dec3: Starting traditional 4D approach for comparison\n");
+    // for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
+    // for(idx=Ns-1;idx>=0;idx--) CalcPBE4D(idx,Nb2);   // 4D後進確率
+    // for(idx=0;   idx<Ns;idx++) CalcPDE4D(idx,Nb2);   // 4D事後確率
 
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
     DelFGE4D();  // 4D lattice memory deallocation
