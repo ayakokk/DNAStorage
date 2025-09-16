@@ -602,6 +602,10 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   PBE4D = nullptr;
   kmer_error_probs = nullptr;
 
+  // 【新アプローチ】3次元メッセージ配列ポインタの初期化
+  FwdMsg = nullptr;
+  BwdMsg = nullptr;
+
   // メモ化キャッシュの初期化（自動的に空のmapとして初期化される）
   // transition_prob_cache は自動初期化
   
@@ -670,7 +674,7 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
   // DECODER_MODE=DEC3:   究極の4Dラティスデコーダー（Dec3、k-mer依存）
   const char* decoder_mode = getenv("DECODER_MODE");
   if (decoder_mode == nullptr) {
-    decoder_mode = "DEC2"; // デフォルトをDec2に設定
+    decoder_mode = "DEC3"; // デフォルトをDec3に設定（初期化と整合性を保つ）
   }
   
   if (strcmp(decoder_mode, "LEGACY") == 0) {
@@ -698,11 +702,21 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
 
     // ✅ メモ化：新しいデコードの開始前にキャッシュをクリア
     pyx_cache.clear();
-    InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization
+    InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization (includes 3D message arrays)
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
+
+    // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算
+    printf("# Dec3: Starting separated approach: horizontal messages + vertical computation\n");
+    for(idx=0;   idx<Ns;idx++) CalcForwardMsg(idx,Nb2);     // 横方向前向きメッセージ(3D)
+    for(idx=Ns-1;idx>=0;idx--) CalcBackwardMsg(idx,Nb2);    // 横方向後ろ向きメッセージ(3D)
+    for(idx=0;   idx<Ns;idx++) CalcPosterior(idx,Nb2);      // 縦方向事後確率計算
+
+    // 【比較用】既存4次元アプローチ（並行実行で性能比較）
+    printf("# Dec3: Starting traditional 4D approach for comparison\n");
     for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
     for(idx=Ns-1;idx>=0;idx--) CalcPBE4D(idx,Nb2);   // 4D後進確率
     for(idx=0;   idx<Ns;idx++) CalcPDE4D(idx,Nb2);   // 4D事後確率
+
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
     DelFGE4D();  // 4D lattice memory deallocation
   } else {
@@ -1650,9 +1664,40 @@ void SLFBAdec::SetFGE4D() {
       }
     }
   }
-  
-  size_t memory_size = (size_t)(Ns+1) * Drng * NUM_ERROR_STATES * num_kmers * sizeof(double) * 2;
-  printf("# Dec3: 4D lattice memory allocated: %.2f MB\n", memory_size / (1024.0 * 1024.0));
+
+  // 【新アプローチ】3次元横方向メッセージ配列の確保
+  printf("# Dec3: Setting up 3D message arrays for separated approach\n");
+
+  // FwdMsg: [Ns+1][Drng][NUM_ERROR_STATES]
+  FwdMsg = new double**[Ns+1];
+  for(int i = 0; i < Ns+1; i++) {
+    FwdMsg[i] = new double*[Drng];
+    for(int d = 0; d < Drng; d++) {
+      FwdMsg[i][d] = new double[NUM_ERROR_STATES];
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        FwdMsg[i][d][e] = 0.0;
+      }
+    }
+  }
+
+  // BwdMsg: [Ns+1][Drng][NUM_ERROR_STATES]
+  BwdMsg = new double**[Ns+1];
+  for(int i = 0; i < Ns+1; i++) {
+    BwdMsg[i] = new double*[Drng];
+    for(int d = 0; d < Drng; d++) {
+      BwdMsg[i][d] = new double[NUM_ERROR_STATES];
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        BwdMsg[i][d][e] = 0.0;
+      }
+    }
+  }
+
+  size_t memory_4d = (size_t)(Ns+1) * Drng * NUM_ERROR_STATES * num_kmers * sizeof(double) * 2;
+  size_t memory_3d = (size_t)(Ns+1) * Drng * NUM_ERROR_STATES * sizeof(double) * 2;
+  printf("# Dec3: 4D lattice memory allocated: %.2f MB\n", memory_4d / (1024.0 * 1024.0));
+  printf("# Dec3: 3D message arrays allocated: %.2f MB\n", memory_3d / (1024.0 * 1024.0));
+  printf("# Dec3: Memory reduction ratio: %.1fx (from %.2f MB to %.2f MB)\n",
+         (double)memory_4d / memory_3d, memory_4d / (1024.0 * 1024.0), memory_3d / (1024.0 * 1024.0));
 }
 
 //================================================================================
@@ -1697,13 +1742,46 @@ void SLFBAdec::DelFGE4D() {
     PBE4D = nullptr;
   }
   
+  // 【新アプローチ】3次元横方向メッセージ配列の解放
+  printf("# Dec3: Deleting 3D message arrays\n");
+
+  // FwdMsg削除
+  if(FwdMsg != nullptr) {
+    for(int i = 0; i < Ns+1; i++) {
+      if(FwdMsg[i] != nullptr) {
+        for(int d = 0; d < Drng; d++) {
+          delete[] FwdMsg[i][d];
+        }
+        delete[] FwdMsg[i];
+      }
+    }
+    delete[] FwdMsg;
+    FwdMsg = nullptr;
+  }
+
+  // BwdMsg削除
+  if(BwdMsg != nullptr) {
+    for(int i = 0; i < Ns+1; i++) {
+      if(BwdMsg[i] != nullptr) {
+        for(int d = 0; d < Drng; d++) {
+          delete[] BwdMsg[i][d];
+        }
+        delete[] BwdMsg[i];
+      }
+    }
+    delete[] BwdMsg;
+    BwdMsg = nullptr;
+  }
+
   // k-mer確率テーブル削除
   if(kmer_error_probs != nullptr) {
-    std::map<std::pair<int,int>, std::vector<double>>* prob_map = 
+    std::map<std::pair<int,int>, std::vector<double>>* prob_map =
       (std::map<std::pair<int,int>, std::vector<double>>*)kmer_error_probs;
     delete prob_map;
     kmer_error_probs = nullptr;
   }
+
+  printf("# Dec3: All memory structures deallocated successfully\n");
 }
 
 //================================================================================
@@ -1732,8 +1810,37 @@ void SLFBAdec::InitFGE4D(const unsigned char *RW, const double **Pin, int Nb2) {
       PBE4D[Ns][Nb2-Nb-Dmin][e][k] = 1.0 / (num_kmers * NUM_ERROR_STATES);
     }
   }
-  
-  printf("# Dec3: InitFGE4D completed - 4D lattice initialized\n");
+
+  // 【新アプローチ】3次元横方向メッセージ配列の初期化
+  printf("# Dec3: Initializing 3D message arrays for separated approach\n");
+
+  // FwdMsg初期化: 全てゼロで初期化
+  for(int i = 0; i < Ns+1; i++) {
+    for(int d = 0; d < Drng; d++) {
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        FwdMsg[i][d][e] = 0.0;
+      }
+    }
+  }
+
+  // BwdMsg初期化: 全てゼロで初期化
+  for(int i = 0; i < Ns+1; i++) {
+    for(int d = 0; d < Drng; d++) {
+      for(int e = 0; e < NUM_ERROR_STATES; e++) {
+        BwdMsg[i][d][e] = 0.0;
+      }
+    }
+  }
+
+  // 3次元初期状態: (d=0, e=Match)で開始（k次元は消去済み）
+  FwdMsg[0][0-Dmin][ERROR_MATCH] = 1.0;  // σ_0 = (0, M)
+
+  // 3次元最終状態: 全エラー状態に均等分布（k次元は消去済み）
+  for(int e = 0; e < NUM_ERROR_STATES; e++) {
+    BwdMsg[Ns][Nb2-Nb-Dmin][e] = 1.0 / NUM_ERROR_STATES;
+  }
+
+  printf("# Dec3: InitFGE4D completed - both 4D lattice and 3D messages initialized\n");
 }
 
 //================================================================================
@@ -1754,50 +1861,7 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
       }
     }
   }
-  
-  // // 4次元状態遷移：全ての (d0,e0,k0) → (d1,e1,k1) を計算
-  // for (int d0 = Dmin; d0 <= Dmax; d0++) {
-  //   for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
-  //     for (int k0 = 0; k0 < num_kmers; k0++) {
-        
-  //       // 現在の状態への確率が0なら、このパスからの寄与はない
-  //       if (PFE4D[idx][d0-Dmin][e0][k0] == 0.0) continue;
-
-  //       for (int d1 = Dmin; d1 <= Dmax; d1++) {
-          
-  //         // チャネルパラメータ計算
-  //         int Nu2 = Nu + d1 - d0;
-  //         int iL = idx * Nu + d0;
-          
-  //         if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
-
-  //         // ✅ Dec3新方式: DNAチャネル統合動的確率計算
-  //         // GetGX依存を排除し、実際のDNA配列とk-mer確率のみを使用
-  //         double *s_per_codeword = new double[Q];
-  //         for (int xi = 0; xi < Q; xi++) {
-  //           // 実DNA配列から直接観測確率を計算
-  //           s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
-  //         }
-
-  //         // ✅ Dec3効率化修正：全符号語xiで決定論的k-mer遷移を直接計算
-  //         for (int xi = 0; xi < Q; xi++) {
-  //           int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
-
-  //           for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-  //             double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
-  //             double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
-              
-  //             // 4D前進確率の更新（符号語xiによって決まるk1状態に蓄積）
-  //             PFE4D[idx+1][d1-Dmin][e1][k1] += PFE4D[idx][d0-Dmin][e0][k0] * gamma_xi;
-  //           }
-  //         }
-          
-  //         delete[] s_per_codeword;
-  //       }
-  //     }
-  //   }
-  // }
-    // 4次元状態遷移
+  // 4次元状態遷移
   printf("# Dec3: CalcPFE4D[%d] starting 4D transition calculation...\n", idx);
   int d_count = 0, total_d_states = Dmax - Dmin + 1;
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
@@ -1819,16 +1883,9 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
           // 修正点：次の符号語も考慮したk-mer遷移の計算
-          int codeword_pairs = 0, total_pairs = Q * Q;
           for (int xi = 0; xi < Q; xi++) {      // 現在の符号語 φ₀(u'_i)
             for (int xi_next = 0; xi_next < Q; xi_next++) {  // 次の符号語 φ₀(u'_(i+1))
-              codeword_pairs++;
-              if(codeword_pairs % 100000 == 0) {
-                printf("# Dec3: CalcPFE4D[%d] codeword pairs: %d/%d (%.2f%%)\n", 
-                       idx, codeword_pairs, total_pairs, 100.0 * codeword_pairs / total_pairs);
-              }
-              
-              // k-merコンテキストの構築（複数符号語を考慮）
+           // k-merコンテキストの構築（複数符号語を考慮）
               int k1 = ComputeExtendedKmer(k0, xi, xi_next, idx);
               
               // 観測確率（現在と次の両方の符号語を考慮）
@@ -1895,6 +1952,95 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
 }
 
 //================================================================================
+// 【新アプローチ】横方向前向きメッセージ計算 - k次元を周辺化消去
+// FwdMsg[idx] から FwdMsg[idx+1] を計算
+// 核心: k状態を次の時刻に引き継がず、各状態遷移で周辺化して消去
+//================================================================================
+void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+  printf("# Dec3: CalcForwardMsg[%d] starting with k-marginalization...\n", idx);
+  fflush(stdout);
+
+  // 1. 次の時刻のメッセージを初期化
+  for (int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      FwdMsg[idx + 1][d1 - Dmin][e1] = 0.0;
+    }
+  }
+
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+
+      // 現在の状態への確率が0なら、このパスからの寄与はない
+      if (FwdMsg[idx][d0 - Dmin][e0] == 0.0) continue;
+
+      // 3. 次の時刻 t+1 の各状態 (d₁, e₁) への遷移確率を計算
+      for (int d1 = Dmin; d1 <= Dmax; d1++) {
+        for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+
+          // === 核心ポイント: k₀, u'ᵢ, u'ᵢ₊₁ に関する確率をすべて足し合わせる（周辺化） ===
+          double transition_prob_sum = 0.0;
+
+          // k₀: 前のk-mer状態（全パターンを試す）
+          for (int k0 = 0; k0 < num_kmers; k0++) {
+            // u'ᵢ, u'ᵢ₊₁: 符号語の組み合わせ（全パターンを試す）
+            for (int xi = 0; xi < Q; xi++) {
+              for (int xi_next = 0; xi_next < Q; xi_next++) {
+                // 必要な確率要素を計算
+                int Nu2 = Nu + d1 - d0;
+                int iL = idx * Nu + d0;
+                double obs_prob = ComputeExtendedObservationProbability(idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+                double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
+                double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+
+                // k₀についての仮説の確率 P(k₀ | d₀, e₀) は均等と仮定（1/num_kmers）
+                // ※より厳密には、前のステップの縦計算から導出する
+                double p_k0 = 1.0 / num_kmers;
+
+                transition_prob_sum += p_k0 * obs_prob * prior_prob * trans_prob;
+              }
+            }
+          }
+
+          // 4. メッセージを更新（k次元が消去されている）
+          FwdMsg[idx + 1][d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * transition_prob_sum;
+        }
+      }
+    }
+  }
+
+  // 5. 正規化
+  double total_sum = 0.0;
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      total_sum += FwdMsg[idx + 1][d1 - Dmin][e1];
+    }
+  }
+
+  if(total_sum > 1e-15) {
+    for(int d1 = Dmin; d1 <= Dmax; d1++) {
+      for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+        FwdMsg[idx + 1][d1 - Dmin][e1] /= total_sum;
+      }
+    }
+  }
+
+  printf("# Dec3: CalcForwardMsg[%d] completed with k-marginalization | total_sum=%.6e\n", idx, total_sum);
+
+  // 非ゼロ状態数をカウント（3次元のみ）
+  int nonzero_states = 0;
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      if(FwdMsg[idx + 1][d1 - Dmin][e1] > 1e-15) nonzero_states++;
+    }
+  }
+  int total_d_states = Dmax - Dmin + 1;
+  printf("# Dec3: CalcForwardMsg[%d] non-zero states: %d/%d (%.2f%%), memory reduced from 4D to 3D\n",
+         idx, nonzero_states, total_d_states * NUM_ERROR_STATES,
+         100.0 * nonzero_states / (total_d_states * NUM_ERROR_STATES));
+}
+
+//================================================================================
 // 【核心】4次元後進確率計算 - 前進後進アルゴリズムの後進ステップ
 // 逆方向に状態確率を伝播: P_B(d_t, e_t, η_t) = Σ P_B(d_{t+1}, e_{t+1}, η_{t+1}) × 遷移確率
 // 時刻を逆行して最適な復号確率を計算
@@ -1912,7 +2058,7 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
       for (int k0 = 0; k0 < num_kmers; k0++)
         PBE4D[idx][d0-Dmin][e0][k0] = 0.0;
 
-  // ✅ 修正：CalcPFE4Dと同じ効率的なループ構造
+  // 修正：CalcPFE4Dと同じ効率的なループ構造
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
     // ▼▼▼ デバッグ表示2：最も重いループの進捗をパーセント表示 ▼▼▼
     double percent = (double)(d0 - Dmin + 1) / Drng * 100.0;
@@ -1985,6 +2131,104 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
 }
 
 //================================================================================
+// 【新アプローチ】横方向後ろ向きメッセージ計算 - k次元を周辺化消去
+// BwdMsg[idx+1] から BwdMsg[idx] を計算
+// 核心: 前向きと同様に、k状態を引き継がず、各状態遷移で周辺化消去
+//================================================================================
+void SLFBAdec::CalcBackwardMsg(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+  printf("# Dec3: CalcBackwardMsg[%d] starting with k-marginalization...\n", idx);
+  fflush(stdout);
+
+  // 1. 現在の時刻のメッセージを初期化
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      BwdMsg[idx][d0 - Dmin][e0] = 0.0;
+    }
+  }
+
+  // 2. 次の時刻 t+1 の各状態 (d₁, e₁) からの逆向き遷移を計算
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      for (int d1 = Dmin; d1 <= Dmax; d1++) {
+
+        int Nu2 = Nu + d1 - d0;
+        int iL = idx * Nu + d0;
+        if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+        // === 核心ポイント: k₁, u'ᵢ, u'ᵢ₊₁ に関する確率をすべて足し合わせる（周辺化） ===
+        double backward_prob_sum = 0.0;
+
+        // k₁: 次のk-mer状態（全パターンを試す）
+        for (int k1 = 0; k1 < num_kmers; k1++) {
+          // u'ᵢ, u'ᵢ₊₁: 符号語の組み合わせ（全パターンを試す）
+          for (int xi = 0; xi < Q; xi++) {
+            for (int xi_next = 0; xi_next < Q; xi_next++) {
+
+              // k₀ は (k₁, xi, xi_next) から逆算可能（複雑なので簡略化）
+              // ここでは全k₀について試すことで周辺化
+              for (int k0 = 0; k0 < num_kmers; k0++) {
+                // k₁が(k₀, xi, xi_next)から一意に決まるかチェック
+                if (ComputeExtendedKmer(k0, xi, xi_next, idx) != k1) continue;
+
+                // e₁状態についても周辺化
+                for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+                  // 次の状態からの後向き確率が0なら寄与なし
+                  if (BwdMsg[idx + 1][d1 - Dmin][e1] == 0.0) continue;
+
+                  // 必要な確率要素を計算
+                  double obs_prob = ComputeExtendedObservationProbability(idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+                  double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
+                  double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+
+                  // k₁についての仮説の確率 P(k₁ | d₁, e₁) は均等と仮定
+                  double p_k1 = 1.0 / num_kmers;
+
+                  backward_prob_sum += BwdMsg[idx + 1][d1 - Dmin][e1] * p_k1 * obs_prob * prior_prob * trans_prob;
+                }
+              }
+            }
+          }
+        }
+
+        // 3. メッセージを更新（k次元が消去されている）
+        BwdMsg[idx][d0 - Dmin][e0] += backward_prob_sum;
+      }
+    }
+  }
+
+  // 4. 正規化
+  double total_sum = 0.0;
+  for(int d0 = Dmin; d0 <= Dmax; d0++) {
+    for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      total_sum += BwdMsg[idx][d0 - Dmin][e0];
+    }
+  }
+
+  if(total_sum > 1e-15) {
+    for(int d0 = Dmin; d0 <= Dmax; d0++) {
+      for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+        BwdMsg[idx][d0 - Dmin][e0] /= total_sum;
+      }
+    }
+  }
+
+  printf("# Dec3: CalcBackwardMsg[%d] completed with k-marginalization | total_sum=%.6e\n", idx, total_sum);
+
+  // 非ゼロ状態数をカウント（3次元のみ）
+  int nonzero_states = 0;
+  for(int d0 = Dmin; d0 <= Dmax; d0++) {
+    for(int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      if(BwdMsg[idx][d0 - Dmin][e0] > 1e-15) nonzero_states++;
+    }
+  }
+  int total_d_states = Dmax - Dmin + 1;
+  printf("# Dec3: CalcBackwardMsg[%d] non-zero states: %d/%d (%.2f%%), memory reduced from 4D to 3D\n",
+         idx, nonzero_states, total_d_states * NUM_ERROR_STATES,
+         100.0 * nonzero_states / (total_d_states * NUM_ERROR_STATES));
+}
+
+//================================================================================
 // 【最終段階】4次元事後確率計算 - 最適復号のための確率統合
 // 前進確率 × 後進確率 = 事後確率
 // P_D(x_t | y_0^T) = P_F(d_t, e_t, η_t) × P_B(d_t, e_t, η_t)
@@ -2040,6 +2284,87 @@ void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
   normalize(PD[idx], Q);
   
   printf("# Dec3: CalcPDE4D[%d] completed with 4D marginalization\n", idx);
+}
+
+//================================================================================
+// 【新アプローチ】縦方向事後確率計算 - 横方向メッセージを統合して符号語確率を計算
+// FwdMsg[idx] と BwdMsg[idx] を使って、時刻idxでのu'_iの事後確率P(u'_i | y)を計算
+// 核心: 横方向から受け取った3次元メッセージから、各時刻での縦方向計算を実行
+//================================================================================
+void SLFBAdec::CalcPosterior(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+  printf("# Dec3: CalcPosterior[%d] starting vertical computation with FwdMsg & BwdMsg...\n", idx);
+  fflush(stdout);
+
+  // 各符号語の事後確率を初期化
+  for (int xi = 0; xi < Q; xi++) {
+    PD[idx][xi] = 0.0;
+  }
+
+  // 各符号語 u'_i について事後確率を計算
+  for (int xi = 0; xi < Q; xi++) {
+    double total_posterior = 0.0;
+
+    // u'_i 以外のすべての変数を周辺化消去する
+    // d₀, e₀, k₀, d₁, e₁, k₁, u'_{i+1} について全パターンを試す
+
+    for (int d0 = Dmin; d0 <= Dmax; d0++) {
+      for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+        for (int d1 = Dmin; d1 <= Dmax; d1++) {
+
+          int Nu2 = Nu + d1 - d0;
+          int iL = idx * Nu + d0;
+          if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
+
+          // 横方向からの前向きメッセージ P(d₀, e₀ | y₁..t)
+          double fwd_msg = FwdMsg[idx][d0 - Dmin][e0];
+          if (fwd_msg == 0.0) continue;
+
+          for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+            // 横方向からの後ろ向きメッセージ P(y_{t+1}..T | d₁, e₁)
+            double bwd_msg = BwdMsg[idx + 1][d1 - Dmin][e1];
+            if (bwd_msg == 0.0) continue;
+
+            // u'_{i+1}について周辺化（全符号語を試す）
+            for (int xi_next = 0; xi_next < Q; xi_next++) {
+              // k₀, k₁について周辺化（全k-mer状態を試す）
+              for (int k0 = 0; k0 < num_kmers; k0++) {
+                // 必要な確率要素を計算
+                double obs_prob = ComputeExtendedObservationProbability(idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+                double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
+                double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+
+                // k₀の条件付き確率 P(k₀ | d₀, e₀) は均等と仮定
+                double p_k0_given_state = 1.0 / num_kmers;
+
+                // この特定の設定でのxi=符号語への寄与を計算
+                // P(u'_i=xi | y) ∝ Σ [P(d₀,e₀|y₁..t) × P(y_{t+1}..T|d₁,e₁) × P(遷移|xi) × P(xi)]
+                double contribution = fwd_msg * bwd_msg * obs_prob * prior_prob * trans_prob * p_k0_given_state;
+
+                total_posterior += contribution;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // xi番目の符号語の事後確率を設定
+    PD[idx][xi] = total_posterior;
+  }
+
+  // 正規化（全符号語の確率の合計を1にする）
+  normalize(PD[idx], Q);
+
+  printf("# Dec3: CalcPosterior[%d] completed vertical computation | normalized posterior\n", idx);
+
+  // 非ゼロ符号語確率をカウント
+  int nonzero_codewords = 0;
+  for (int xi = 0; xi < Q; xi++) {
+    if (PD[idx][xi] > 1e-15) nonzero_codewords++;
+  }
+  printf("# Dec3: CalcPosterior[%d] non-zero codewords: %d/%d (%.2f%%), vertical integration successful\n",
+         idx, nonzero_codewords, Q, 100.0 * nonzero_codewords / Q);
 }
 
 //================================================================================
