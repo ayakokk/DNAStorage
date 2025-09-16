@@ -33,9 +33,15 @@ private:
   double ***PFE, ***PBE; // [Ns+1][Drng][NUM_ERROR_STATES]: エラー状態を含む前進/後進確率
   double ***PE;          // [Ns][NUM_ERROR_STATES][NUM_ERROR_STATES]: エラー状態遷移確率
   
-  // k-mer依存4次元ラティス関連データ構造
+  // k-mer依存ラティス関連データ構造（分離アプローチ）
   static const int KMER_LENGTH = 4;           // k-mer長 (k=4固定)
   int num_kmers;                              // 4^KMER_LENGTH = 256 for k=4
+
+  // 【新アプローチ】横方向メッセージ（3次元）- 時間軸での情報伝播用
+  double ***FwdMsg;                           // [Ns+1][Drng][NUM_ERROR_STATES]: 前向きメッセージ P(d_t, e_t | y_1..t)
+  double ***BwdMsg;                           // [Ns+1][Drng][NUM_ERROR_STATES]: 後ろ向きメッセージ P(y_t+1..T | d_t, e_t)
+
+  // 【互換性用】既存4次元配列（段階的移行用、最終的に削除予定）
   double ****PFE4D, ****PBE4D;               // [Ns+1][Drng][NUM_ERROR_STATES][num_kmers]: 4D前進/後進確率
   
   // 論文式(41): P(e_{t+1} | e_t, η_{t+1}) のテーブル
@@ -103,6 +109,12 @@ private:
   double ComputeObservationProbabilityFromDNA(int idx, int Nu2, int iL, int xi, int k0, int e0, int Nb2); // DNAチャネル統合観測確率計算
   double CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error, int kmer, int codeword_xi); // 動的確率を使った観測確率計算(CalcPyxの進化版)
   double Psub_quaternary(unsigned char a, unsigned char b, double dynamic_ps); // 動的ps対応のPsub_quaternaryオーバーロード
+  // 【新アプローチ】分離型計算メソッド
+  void CalcForwardMsg(int idx, int Nb2);     // 横方向前向きメッセージ計算（k次元を周辺化）
+  void CalcBackwardMsg(int idx, int Nb2);    // 横方向後ろ向きメッセージ計算（k次元を周辺化）
+  void CalcPosterior(int idx, int Nb2);      // 縦方向事後確率計算（各時刻での内部計算）
+
+  // 【互換性用】既存4次元計算メソッド（段階的移行用）
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
   void CalcPBE4D(int idx, int Nb2);    // 4次元後進確率計算
   void CalcPDE4D(int idx, int Nb2);    // 4次元事後確率計算
