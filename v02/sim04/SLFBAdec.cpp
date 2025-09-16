@@ -34,6 +34,7 @@ DNA データストレージシステム用の制約符号デコーダー実装
 #include <assert.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -41,6 +42,25 @@ DNA データストレージシステム用の制約符号デコーダー実装
 #include "SLFBAdec.hpp"
 
 #define NuMax 10
+
+//================================================================================
+// ビームサーチ用の構造体と定数
+//================================================================================
+
+// 状態とその確率を保持するための構造体
+struct StateInfo {
+    int d;      // ドリフト状態
+    int e;      // エラー状態
+    double prob; // その状態の確率
+
+    // 確率の大きい順（降順）にソートするための比較演算子
+    bool operator<(const StateInfo& other) const {
+        return prob > other.prob;
+    }
+};
+
+// デフォルトビーム幅
+const int DEFAULT_BEAM_WIDTH = 32;
 
 //================================================================================
 // 基本ユーティリティ関数
@@ -606,6 +626,19 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   FwdMsg = nullptr;
   BwdMsg = nullptr;
 
+  // ビームサーチパラメータの初期化（環境変数から設定可能）
+  const char* beam_width_str = getenv("BEAM_WIDTH");
+  if (beam_width_str != nullptr) {
+    beam_width = atoi(beam_width_str);
+    if (beam_width <= 0) {
+      beam_width = DEFAULT_BEAM_WIDTH;
+      printf("# Warning: Invalid BEAM_WIDTH environment variable, using default %d\n", DEFAULT_BEAM_WIDTH);
+    }
+  } else {
+    beam_width = DEFAULT_BEAM_WIDTH;
+  }
+  printf("# SLFBAdec: Beam Search enabled with width = %d\n", beam_width);
+
   // メモ化キャッシュの初期化（自動的に空のmapとして初期化される）
   // transition_prob_cache は自動初期化
   
@@ -705,10 +738,10 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization (includes 3D message arrays)
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
 
-    // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算
-    printf("# Dec3: Starting separated approach: horizontal messages + vertical computation\n");
-    for(idx=0;   idx<Ns;idx++) CalcForwardMsg(idx,Nb2);     // 横方向前向きメッセージ(3D)
-    for(idx=Ns-1;idx>=0;idx--) CalcBackwardMsg(idx,Nb2);    // 横方向後ろ向きメッセージ(3D)
+    // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算（ビームサーチ版）
+    printf("# Dec3: Starting separated approach with Beam Search: horizontal messages + vertical computation\n");
+    for(idx=0;   idx<Ns;idx++) CalcForwardMsgBeam(idx,Nb2);     // ビームサーチ版前向きメッセージ(3D)
+    for(idx=Ns-1;idx>=0;idx--) CalcBackwardMsg(idx,Nb2);       // 横方向後ろ向きメッセージ(3D)
     for(idx=0;   idx<Ns;idx++) CalcPosterior(idx,Nb2);      // 縦方向事後確率計算
 
     // 【比較用】既存4次元アプローチ（並行実行で性能比較）
@@ -1958,13 +1991,14 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
 //================================================================================
 void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
-  printf("# Dec3: CalcForwardMsg[%d] starting with k-marginalization...\n", idx);
+  printf("# Dec3: CalcForwardMsg[%d] with Beam Search (Width=%d)...\n", idx, beam_width);
   fflush(stdout);
 
-  // 1. 次の時刻のメッセージを初期化
-  for (int d1 = Dmin; d1 <= Dmax; d1++) {
-    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-      FwdMsg[idx + 1][d1 - Dmin][e1] = 0.0;
+  // ①-1. 次の時刻 t+1 の全状態の確率を一時的に計算・蓄積するための配列
+  double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  for (int d = 0; d < Drng; d++) {
+    for (int e = 0; e < NUM_ERROR_STATES; e++) {
+      TempFwdMsg[d][e] = 0.0;
     }
   }
 
@@ -2038,6 +2072,96 @@ void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
   printf("# Dec3: CalcForwardMsg[%d] non-zero states: %d/%d (%.2f%%), memory reduced from 4D to 3D\n",
          idx, nonzero_states, total_d_states * NUM_ERROR_STATES,
          100.0 * nonzero_states / (total_d_states * NUM_ERROR_STATES));
+}
+
+//================================================================================
+// 【ビームサーチ版】横方向前向きメッセージ計算
+// 計算量削減のため上位beam_width個の状態のみ保持
+//================================================================================
+void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+  printf("# Dec3: CalcForwardMsgBeam[%d] with Beam Search (Width=%d)...\n", idx, beam_width);
+  fflush(stdout);
+
+  // ①-1. 一時配列で全状態の確率を計算
+  double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  for (int d = 0; d < Drng; d++) {
+    for (int e = 0; e < NUM_ERROR_STATES; e++) {
+      TempFwdMsg[d][e] = 0.0;
+    }
+  }
+
+  // 2. 現在のビーム内状態からの遷移計算
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      if (FwdMsg[idx][d0 - Dmin][e0] == 0.0) continue;
+
+      for (int d1 = Dmin; d1 <= Dmax; d1++) {
+        for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+          double transition_prob_sum = 0.0;
+
+          // k次元周辺化（簡略版）
+          for (int k0 = 0; k0 < num_kmers; k0++) {
+            for (int xi = 0; xi < Q; xi++) {
+              for (int xi_next = 0; xi_next < Q; xi_next++) {
+                int Nu2 = Nu + d1 - d0;
+                int iL = idx * Nu + d0;
+                double obs_prob = ComputeExtendedObservationProbability(idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+                double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
+                double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+                double p_k0 = 1.0 / num_kmers;
+
+                transition_prob_sum += p_k0 * obs_prob * prior_prob * trans_prob;
+              }
+            }
+          }
+
+          TempFwdMsg[d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * transition_prob_sum;
+        }
+      }
+    }
+  }
+
+  // ②ビームサーチ: 上位beam_width個の状態のみ保持
+  std::vector<StateInfo> next_states;
+  for (int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      if (TempFwdMsg[d1 - Dmin][e1] > 0) {
+        next_states.push_back({d1, e1, TempFwdMsg[d1 - Dmin][e1]});
+      }
+    }
+  }
+
+  std::sort(next_states.begin(), next_states.end());
+  if (next_states.size() > beam_width) {
+    next_states.resize(beam_width);
+  }
+
+  // ③次の時刻のメッセージ配列に書き戻し
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      FwdMsg[idx + 1][d1 - Dmin][e1] = 0.0;
+    }
+  }
+
+  for (const auto& state : next_states) {
+    FwdMsg[idx + 1][state.d - Dmin][state.e] = state.prob;
+  }
+
+  // 正規化
+  double total_sum = 0.0;
+  for (const auto& state : next_states) {
+    total_sum += state.prob;
+  }
+
+  if(total_sum > 1e-15) {
+    for (const auto& state : next_states) {
+      FwdMsg[idx + 1][state.d - Dmin][state.e] /= total_sum;
+    }
+  }
+
+  printf("# Dec3: CalcForwardMsgBeam[%d] completed | beam_states=%lu/%d\n",
+         idx, next_states.size(), beam_width);
 }
 
 //================================================================================

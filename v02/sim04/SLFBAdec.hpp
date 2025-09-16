@@ -114,6 +114,13 @@ private:
   void CalcBackwardMsg(int idx, int Nb2);    // 横方向後ろ向きメッセージ計算（k次元を周辺化）
   void CalcPosterior(int idx, int Nb2);      // 縦方向事後確率計算（各時刻での内部計算）
 
+  // 【ビームサーチ版】計算量削減メソッド
+  void CalcForwardMsgBeam(int idx, int Nb2); // ビームサーチ版前向きメッセージ計算
+  void CalcBackwardMsgBeam(int idx, int Nb2);// ビームサーチ版後ろ向きメッセージ計算
+
+  // ビームサーチパラメータ
+  int beam_width;                            // ビーム幅（環境変数またはデフォルト値で設定）
+
   // 【互換性用】既存4次元計算メソッド（段階的移行用）
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
   void CalcPBE4D(int idx, int Nb2);    // 4次元後進確率計算
