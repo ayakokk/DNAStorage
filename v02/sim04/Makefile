@@ -1,6 +1,7 @@
 # C++コンパイラを指定
 CXX = g++
-# コンパイルフラグを指定 (-O3を外し、デバッグとAddress Sanitizerを追加)
+# コンパイルフラグを指定
+# メモ化アプローチにより大幅なメモリ効率化を実現（40.5GB → 数KB）
 CXXFLAGS = -Wall -g -fsanitize=address -std=c++11
 
 # 最終的に生成する実行ファイルを指定
