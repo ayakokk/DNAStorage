@@ -1319,11 +1319,11 @@ int SLFBAdec::ComputeExtendedKmer(int current_kmer, int xi_current,
   GetKmerFromIndex(current_kmer, kmer_seq);
   
   // 現在と次の符号語を取得
-    // 動的配列を使用
-  unsigned char *cw_current = new unsigned char[Nu];
-  unsigned char *cw_next = new unsigned char[Nu];
-  ICB->Get_CW(cw_current, xi_current);
-  ICB->Get_CW(cw_next, xi_next);
+  // 動的配列を使用
+  std::vector<unsigned char> cw_current(Nu);
+  std::vector<unsigned char> cw_next(Nu);
+  ICB->Get_CW(cw_current.data(), xi_current);
+  ICB->Get_CW(cw_next.data(), xi_next);
   
   // 論文の式に従い、k/v個の過去の符号語と現在・次の符号語を結合
   // ここでは簡略化のため、最新2つの符号語のみを使用
