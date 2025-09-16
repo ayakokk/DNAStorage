@@ -601,6 +601,9 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   PFE4D = nullptr;
   PBE4D = nullptr;
   kmer_error_probs = nullptr;
+
+  // メモ化キャッシュの初期化（自動的に空のmapとして初期化される）
+  // transition_prob_cache は自動初期化
   
   // 論文 Table 2 に基づく4値置換確率行列の初期化
   // P(b|a) = aがbに置換される条件付き確率 (A=0, C=1, G=2, T=3)
@@ -649,7 +652,11 @@ SLFBAdec::~SLFBAdec(){
   DelFG();
   DelFGE();
   DelFGE4D();  // Dec3: 4次元ラティスメモリ解放
-  printf("# SLFBAdec: deleted (including Dec3 4D lattice)\n");
+
+  // メモ化キャッシュのクリア
+  transition_prob_cache.clear();
+
+  printf("# SLFBAdec: deleted (including Dec3 4D lattice and memoization cache)\n");
 }
 
 //================================================================================
@@ -684,6 +691,11 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
   } else if (strcmp(decoder_mode, "DEC3") == 0) {
     printf("# Using Dec3 4D lattice decoder with k-mer dependency (ultimate decoder)\n");
+
+    // メモ化キャッシュのクリア（新しいデコーディングセッション開始）
+    printf("# Dec3: Using memoized transition probability calculation for memory efficiency.\n");
+    transition_prob_cache.clear(); // 前回のキャッシュをクリア
+
     // ✅ メモ化：新しいデコードの開始前にキャッシュをクリア
     pyx_cache.clear();
     InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization
@@ -1786,7 +1798,14 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
   //   }
   // }
     // 4次元状態遷移
+  printf("# Dec3: CalcPFE4D[%d] starting 4D transition calculation...\n", idx);
+  int d_count = 0, total_d_states = Dmax - Dmin + 1;
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    d_count++;
+    if(d_count % 10 == 0 || d_count == total_d_states) {
+      printf("# Dec3: CalcPFE4D[%d] drift progress: %d/%d (%.1f%%)\n", 
+             idx, d_count, total_d_states, 100.0 * d_count / total_d_states);
+    }
     for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
       for (int k0 = 0; k0 < num_kmers; k0++) {
         
@@ -1800,8 +1819,14 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
           // 修正点：次の符号語も考慮したk-mer遷移の計算
+          int codeword_pairs = 0, total_pairs = Q * Q;
           for (int xi = 0; xi < Q; xi++) {      // 現在の符号語 φ₀(u'_i)
             for (int xi_next = 0; xi_next < Q; xi_next++) {  // 次の符号語 φ₀(u'_(i+1))
+              codeword_pairs++;
+              if(codeword_pairs % 100000 == 0) {
+                printf("# Dec3: CalcPFE4D[%d] codeword pairs: %d/%d (%.2f%%)\n", 
+                       idx, codeword_pairs, total_pairs, 100.0 * codeword_pairs / total_pairs);
+              }
               
               // k-merコンテキストの構築（複数符号語を考慮）
               int k1 = ComputeExtendedKmer(k0, xi, xi_next, idx);
@@ -1811,15 +1836,19 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
                 idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
               
               for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-                // 拡張されたk-merコンテキストでのエラー確率
-                double kmer_error_prob = GetExtendedKmerErrorProb(
-                  e0, k0, xi, xi_next, e1);
+                // ▼▼▼【計算量爆発解決】▼▼▼
+                // 従来: 毎回重い計算実行
+                // double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+
+                // 改善: メモ化によるオンデマンド計算（メモリ効率版）
+                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
                 
                 // 次の符号語の事前確率も考慮
                 double gamma = obs_prob * PU[idx][xi] * 
                               (idx+1 < Ns ? PU[idx+1][xi_next] : 1.0/Q) * 
                               kmer_error_prob;
-                
+                //kで周辺かするので、kの次元がいらない
                 PFE4D[idx+1][d1-Dmin][e1][k1] += 
                   PFE4D[idx][d0-Dmin][e0][k0] * gamma;
               }
@@ -1849,7 +1878,20 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
     }
   }
   
-  printf("# Dec3: CalcPFE4D[%d] completed with P(e_{t+1}|e_t,η_{t+1})\n", idx);
+  printf("# Dec3: CalcPFE4D[%d] completed with P(e_{t+1}|e_t,η_{t+1}) | total_sum=%.6e\n", idx, total_sum);
+  
+  // 非ゼロ状態数をカウントして表示
+  int nonzero_states = 0;
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for(int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      for(int k1 = 0; k1 < num_kmers; k1++) {
+        if(PFE4D[idx+1][d1-Dmin][e1][k1] > 1e-15) nonzero_states++;
+      }
+    }
+  }
+  printf("# Dec3: CalcPFE4D[%d] non-zero states: %d/%d (%.2f%%)\n", 
+         idx, nonzero_states, total_d_states * NUM_ERROR_STATES * num_kmers,
+         100.0 * nonzero_states / (total_d_states * NUM_ERROR_STATES * num_kmers));
 }
 
 //================================================================================
@@ -1885,22 +1927,34 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
           int iL = idx * Nu + d0;
           if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
 
-          std::vector<double> s_per_codeword(Q);
-          for(int xi=0; xi < Q; xi++) {
-            s_per_codeword[xi] = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
-          }
-
+          // ▼▼▼【重要修正】CalcPFE4Dと同じアルゴリズムに統一▼▼▼
+          // 後進確率も(xi, xi_next)ペアで正確な遷移確率を計算
           for (int xi = 0; xi < Q; xi++) {
-            int k1 = ComputeNextKmer(k0, xi);
-            for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-              if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
+            for (int xi_next = 0; xi_next < Q; xi_next++) {
+              // CalcPFE4Dと同じk-mer遷移計算
+              int k1 = ComputeExtendedKmer(k0, xi, xi_next, idx);
 
-              double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
-              double gamma_xi = s_per_codeword[xi] * PU[idx][xi] * kmer_error_prob;
+              // 拡張観測確率（xi, xi_nextペアを考慮）
+              double obs_prob = ComputeExtendedObservationProbability(
+                idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
 
-              PBE4D[idx][d0-Dmin][e0][k0] += PBE4D[idx+1][d1-Dmin][e1][k1] * gamma_xi;
+              for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+                if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
+
+                // ▼▼▼【計算量爆発解決】正しい(xi, xi_next)ペアでルックアップ▼▼▼
+                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+                // 次の符号語の事前確率も考慮（CalcPFE4Dと同じ）
+                double gamma = obs_prob * PU[idx][xi] *
+                              (idx+1 < Ns ? PU[idx+1][xi_next] : 1.0/Q) *
+                              kmer_error_prob;
+
+                PBE4D[idx][d0-Dmin][e0][k0] += PBE4D[idx+1][d1-Dmin][e1][k1] * gamma;
+              }
             }
           }
+          // ▲▲▲【修正完了】前進と後進で同じ遷移確率を使用▲▲▲
         }
       }
     }
@@ -1939,43 +1993,133 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
 void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
   
-  // ✅ Dec3効率化修正：8重ネストループを劇的に簡略化
+  // ▼▼▼【重要修正】CalcPDE4D：xi_nextを考慮した正確な事後確率計算▼▼▼
   for (int xi = 0; xi < Q; xi++) {
     PD[idx][xi] = 0.0;
-    
+
     for (int d0 = Dmin; d0 <= Dmax; d0++) {
       for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
         for (int k0 = 0; k0 < num_kmers; k0++) {
-
           if (PFE4D[idx][d0-Dmin][e0][k0] == 0.0) continue;
 
           for (int d1 = Dmin; d1 <= Dmax; d1++) {
             int Nu2 = Nu + d1 - d0;
             int iL = idx * Nu + d0;
             if ((Nu2 < 0) || (Nu2 > 2 * Nu) || (iL < 0) || (iL + Nu2 > Nb2)) continue;
-            
-            // ✅ Dec3新方式: DNAチャネル統合動的確率計算（CalcPDE4D用）
-            double obs_prob = ComputeObservationProbabilityFromDNA(idx, Nu2, iL, xi, k0, e0, Nb2);
 
-            int k1 = ComputeNextKmer(k0, xi); // 決定論的遷移: k0 + xi → k1
+            // 前進・後進と同じ(xi, xi_next)ペアでの計算
+            for (int xi_next = 0; xi_next < Q; xi_next++) {
+              // 拡張k-mer遷移計算（CalcPFE4D, CalcPBE4Dと同じ）
+              int k1 = ComputeExtendedKmer(k0, xi, xi_next, idx);
 
-            for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-              double kmer_error_prob = GetKmerErrorProb(e0, k1, e1);
-              double posterior_contrib = PFE4D[idx][d0-Dmin][e0][k0] * obs_prob * PU[idx][xi] * kmer_error_prob * PBE4D[idx+1][d1-Dmin][e1][k1];
-              
-              PD[idx][xi] += posterior_contrib;
-              printf("# Debug: idx=%d, xi=%d, d0=%d, e0=%d, k0=%d, d1=%d, e1=%d, k1=%d, contrib=%.6e\n", 
-                     idx, xi, d0, e0, k0, d1, e1, k1, posterior_contrib);
+              // 拡張観測確率（xi, xi_nextペアを考慮）
+              double obs_prob = ComputeExtendedObservationProbability(
+                idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+
+              for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+                // ▼▼▼【計算量爆発解決】事前計算テーブル使用▼▼▼
+                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+                // 事後確率の正確な計算（次の符号語の事前確率も考慮）
+                double posterior_contrib = PFE4D[idx][d0-Dmin][e0][k0] * obs_prob *
+                                         PU[idx][xi] * (idx+1 < Ns ? PU[idx+1][xi_next] : 1.0/Q) *
+                                         kmer_error_prob * PBE4D[idx+1][d1-Dmin][e1][k1];
+
+                PD[idx][xi] += posterior_contrib;
+              }
             }
           }
         }
       }
     }
   }
+  // ▲▲▲【修正完了】前進・後進・事後確率で一貫した遷移確率を使用▲▲▲
   
   // 正規化（符号語確率の合計を1にする）
   normalize(PD[idx], Q);
   
   printf("# Dec3: CalcPDE4D[%d] completed with 4D marginalization\n", idx);
 }
+
+//================================================================================
+// メモ化による遷移確率計算（メモリ効率版）
+// オンデマンドで確率を計算し、結果をキャッシュして再利用
+// P(e1|e0, k0, xi, xi_next) の計算とメモ化
+//================================================================================
+double SLFBAdec::GetOrComputeTransitionProb(int e0, int k0, int xi, int xi_next, int e1) {
+  assert(e0 >= 0 && e0 < NUM_ERROR_STATES);
+  assert(k0 >= 0 && k0 < num_kmers);
+  assert(xi >= 0 && xi < Q);
+  assert(xi_next >= 0 && xi_next < Q);
+  assert(e1 >= 0 && e1 < NUM_ERROR_STATES);
+
+  // キャッシュキーを作成
+  std::tuple<int, int, int, int, int> key = std::make_tuple(e0, k0, xi, xi_next, e1);
+
+  // キャッシュに存在するかチェック
+  auto it = transition_prob_cache.find(key);
+  if (it != transition_prob_cache.end()) {
+    // キャッシュヒット：既に計算済み
+    return it->second;
+  }
+
+  // キャッシュミス：新規計算が必要
+  double prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+
+  // 計算結果をキャッシュに保存
+  transition_prob_cache[key] = prob;
+
+  return prob;
+}
+
+//================================================================================
+// メモ化キャッシュのクリア（メモリ解放）
+//================================================================================
+void SLFBAdec::ClearTransitionProbCache() {
+  size_t cache_size = transition_prob_cache.size();
+  transition_prob_cache.clear();
+  printf("# Dec3: Transition probability cache cleared (%zu entries freed)\n", cache_size);
+}
+
+//================================================================================
+// メモ化キャッシュの内容をファイル出力（デバッグ用）
+// 実際に使用された遷移確率のみを出力（メモリ効率的）
+//================================================================================
+void SLFBAdec::ExportTransitionProbCache(const char* filename) const {
+  printf("# Dec3: メモ化キャッシュを %s に出力中...\n", filename);
+
+  FILE* file = fopen(filename, "w");
+  if (!file) {
+    printf("# Error: ファイル %s を書き込み用に開けませんでした。\n", filename);
+    return;
+  }
+
+  // ヘッダー情報をファイルに書き込み
+  fprintf(file, "# メモ化キャッシュ内容: P(e1 | e0, k0, xi, xi_next)\n");
+  fprintf(file, "# 形式: e0, k0, xi, xi_next, e1, probability\n");
+  fprintf(file, "# e0, e1: エラー状態 (0:Match, 1:Insertion, 2:Deletion, 3:Substitution)\n");
+  fprintf(file, "# k0: 前のk-merインデックス (0-%d)\n", num_kmers - 1);
+  fprintf(file, "# xi: 現在の符号語インデックス (0-%d)\n", Q - 1);
+  fprintf(file, "# xi_next: 次の符号語インデックス (0-%d)\n", Q - 1);
+  fprintf(file, "# 実際に使用されたエントリ数: %zu\n", transition_prob_cache.size());
+  fprintf(file, "e0\tk0\txi\txi_next\te1\tprobability\n");
+
+  // キャッシュ内容をファイルに出力
+  for (const auto& entry : transition_prob_cache) {
+    const auto& key = entry.first;
+    double prob = entry.second;
+
+    fprintf(file, "%d\t%d\t%d\t%d\t%d\t%.12e\n",
+            std::get<0>(key), std::get<1>(key), std::get<2>(key),
+            std::get<3>(key), std::get<4>(key), prob);
+  }
+
+  fclose(file);
+  printf("# Dec3: メモ化キャッシュ出力完了。%zu エントリを出力しました。\n",
+         transition_prob_cache.size());
+  printf("# Dec3: ファイル: %s\n", filename);
+}
+
+//================================================================================
 

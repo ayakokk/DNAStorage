@@ -1,4 +1,5 @@
 #include <map>
+#include <tuple>
 class SLFBAdec {
 private:
   // エラー状態定数
@@ -41,6 +42,10 @@ private:
   // キー: (直前のエラー e_t, 次のk-mer η_{t+1})
   // 値: [P(e_{t+1}=Match), P(e_{t+1}=Insertion), P(e_{t+1}=Deletion), P(e_{t+1}=Substitution)]
   void* kmer_error_probs;                     // std::map<std::pair<int,int>, std::vector<double>>* として使用
+
+  // メモ化キャッシュ：遷移確率のオンデマンド計算（メモリ効率）
+  // キー: (e0, k0, xi, xi_next, e1) → 値: P(e1|e0, k0, xi, xi_next)
+  std::map<std::tuple<int, int, int, int, int>, double> transition_prob_cache;
   
   // 4値置換確率行列 (論文Table 2対応)
   double SubMatrix[4][4];                     // P(b|a) = aがbに置換される条件付き確率 (A=0, C=1, G=2, T=3)
@@ -94,7 +99,6 @@ private:
   int  GetKmerIndex(const unsigned char *kmer_seq);      // k-mer配列をインデックスに変換
   void GetKmerFromIndex(int kmer_idx, unsigned char *kmer_seq); // インデックスからk-mer配列に変換
   int  ComputeNextKmer(int current_kmer, int codeword_xi);     // 決定論的k-mer遷移: k_t + xi → k_{t+1}
-  void LoadKmerErrorProbabilities(const char* dir_path); // DNArSim-mainから P(e_{t+1}|e_t,η_{t+1}) を読み込み
   double GetKmerErrorProb(int prev_error, int next_kmer, int next_error); // 論文式(41)の確率を取得
   double ComputeObservationProbabilityFromDNA(int idx, int Nu2, int iL, int xi, int k0, int e0, int Nb2); // DNAチャネル統合観測確率計算
   double CalcPyx_dynamic(long y, long x, int ly, int lx, int prev_error, int kmer, int codeword_xi); // 動的確率を使った観測確率計算(CalcPyxの進化版)
@@ -126,5 +130,11 @@ public:
   void exportGDTable(const char* filename);
   void exportGXTable(const char* filename);
   void exportAllTables(const char* output_dir);
+
+  // メモ化遷移確率関数（メモリ効率版）
+  double GetOrComputeTransitionProb(int e0, int k0, int xi, int xi_next, int e1); // オンデマンド計算＋メモ化
+  void ClearTransitionProbCache();          // キャッシュクリア（メモリ解放）
+  void ExportTransitionProbCache(const char* filename) const;          // キャッシュ内容をファイル出力（デバッグ用）
+  void LoadKmerErrorProbabilities(const char* dir_path); // DNArSim-mainから P(e_{t+1}|e_t,η_{t+1}) を読み込み（公開API）
  
 };
