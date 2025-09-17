@@ -190,17 +190,20 @@ int main(int argc, char *argv[]){
   int Nb,Nb2;      // block length & recv length (bits)
   int Q, Nu;       // numCW, symbol-len [ICB]
   int seed;
+  double sparse_threshold;
   char *fn;
   char *fncb    = new char [BSIZE];
   char *fnconst = new char [BSIZE];
   char *fncm    = new char [BSIZE];
-  if(argc!=4){
-    fprintf(stderr,"Usage: %s <ICB_dir> <N> <Pi> <Pd> <Ps> <seed|-1>\n",argv[0]);
+  if(argc!=5){
+    fprintf(stderr,"Usage: %s <ICB_dir> <N> <seed|-1> <sparse_threshold>\n",argv[0]);
+    fprintf(stderr,"  sparse_threshold: 事前計算で枝刈りする確率閾値 (e.g., 1e-6)\n");
     return 1;
   } // if
-  fn   =      argv[1];
-  N    = atoi(argv[2]);
-  seed = atoi(argv[3]);
+  fn               =      argv[1];
+  N                = atoi(argv[2]);
+  seed             = atoi(argv[3]);
+  sparse_threshold = atof(argv[4]);
   if(seed==-1) seed = (int)time(NULL);
   srandom(seed);
   assert(N>0);
@@ -275,7 +278,7 @@ int main(int argc, char *argv[]){
       printf("# [Dec3] Starting 4D lattice decoding (k-mer + error state memory)\n");
     }
     
-    DEC->Decode(Pout,RW,Nb2,IW);  // Dec3 ultimate decoder
+    DEC->Decode(Pout,RW,Nb2,IW, sparse_threshold);  // Dec3 ultimate decoder
     HardDecision(DW,(const double **)Pout,N,Q);
     OutputConv(DWL,(const double **)Pout,N,Q);
     if(DCM != nullptr) {

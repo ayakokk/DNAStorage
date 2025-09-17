@@ -118,8 +118,24 @@ private:
   void CalcForwardMsgBeam(int idx, int Nb2); // ビームサーチ版前向きメッセージ計算
   void CalcBackwardMsgBeam(int idx, int Nb2);// ビームサーチ版後ろ向きメッセージ計算
 
+  // 【スパース遷移行列】静的枝刈り関数
+  void PrecomputeSparseTransitions(double threshold = 1e-6); // 静的枝刈りによるスパース遷移行列の事前計算
+
   // ビームサーチパラメータ
   int beam_width;                            // ビーム幅（環境変数またはデフォルト値で設定）
+
+  // 【スパース遷移行列】計算量削減用データ構造（修正版）
+  // 1つの「高確率な遷移先」の情報
+  struct SparseTransitionInfo {
+    int next_e;     // 到達点のエラー状態 e₁
+    int next_k;     // 到達点のk-mer状態 k₁
+    double prob;    // 遷移確率 P(e₁ | e₀, k₀, xi, xi_next)
+  };
+
+  // スパース遷移リストのマップ
+  // キー: tuple(e₀, k₀, xi, xi_next) -> 値: 遷移先リスト
+  std::map<std::tuple<int, int, int, int>, std::vector<SparseTransitionInfo>> sparse_transitions;
+  bool precomputation_done;
 
   // 【互換性用】既存4次元計算メソッド（段階的移行用）
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
@@ -141,8 +157,8 @@ private:
 public:
   SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class IDSchannel *_CH);
   ~SLFBAdec();
-  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin);
-  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW);  // (uniform prior)
+  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin, double sparse_threshold = 1e-6);
+  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, double sparse_threshold = 1e-6);  // (uniform prior)
   void PrintNode(int idx, int iw);
   void PrintNode(const int *dbgIW);
   // テーブル出力機能

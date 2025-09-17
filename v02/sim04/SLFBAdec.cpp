@@ -639,6 +639,9 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   }
   printf("# SLFBAdec: Beam Search enabled with width = %d\n", beam_width);
 
+  // スパース遷移行列の初期化
+  precomputation_done = false;
+
   // メモ化キャッシュの初期化（自動的に空のmapとして初期化される）
   // transition_prob_cache は自動初期化
   
@@ -697,7 +700,7 @@ SLFBAdec::~SLFBAdec(){
 }
 
 //================================================================================
-void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin){
+void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin, double sparse_threshold){
   int idx;
   assert( Nb2>=Nb+Dmin && Nb2<=Nb+Dmax );
   
@@ -738,6 +741,10 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization (includes 3D message arrays)
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
 
+    // 【スパース遷移行列】高速化のための事前計算
+    printf("# Dec3: Precomputing sparse transition matrices for performance optimization...\n");
+    PrecomputeSparseTransitions(sparse_threshold);  // 引数で指定された閾値以下の遷移を枝刈り
+
     // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算（ビームサーチ版）
     printf("# Dec3: Starting separated approach with Beam Search: horizontal messages + vertical computation\n");
     for(idx=0;   idx<Ns;idx++) CalcForwardMsgBeam(idx,Nb2);     // ビームサーチ版前向きメッセージ(3D)
@@ -774,13 +781,13 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
 }
 
 //================================================================================
-void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW){
+void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, double sparse_threshold){
   double **Pin = new double * [Ns];
   for(int i=0;i<Ns;i++){
     Pin[i] = new double [Q];
     for(int x=0;x<Q;x++) Pin[i][x] = (double)1.0/Q;
   } // for i
-  Decode(Pout,RW,Nb2,dbgIW,(const double **)Pin);
+  Decode(Pout,RW,Nb2,dbgIW,(const double **)Pin, sparse_threshold);
   for(int i=0;i<Ns;i++) delete [] Pin[i];
   delete [] Pin;
 }
@@ -2091,32 +2098,51 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
     }
   }
 
-  // 2. 現在のビーム内状態からの遷移計算
+  // 2. 【スパース遷移行列】高速化された遷移計算（修正版）
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
     for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
       if (FwdMsg[idx][d0 - Dmin][e0] == 0.0) continue;
 
-      for (int d1 = Dmin; d1 <= Dmax; d1++) {
-        for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-          double transition_prob_sum = 0.0;
+      for (int k0 = 0; k0 < num_kmers; k0++) {
+        // P(k₀|d₀,e₀)を考慮（現在は均等分布と仮定）
+        double p_k0 = 1.0 / num_kmers;
 
-          // k次元周辺化（簡略版）
-          for (int k0 = 0; k0 < num_kmers; k0++) {
-            for (int xi = 0; xi < Q; xi++) {
-              for (int xi_next = 0; xi_next < Q; xi_next++) {
+        for (int xi = 0; xi < Q; xi++) {
+          for (int xi_next = 0; xi_next < Q; xi_next++) {
+
+            // 【高速化の核心】スパース遷移リストを取得
+            auto key = std::make_tuple(e0, k0, xi, xi_next);
+            auto sparse_it = sparse_transitions.find(key);
+
+            if (sparse_it == sparse_transitions.end()) {
+              // 有効な遷移がない場合はスキップ（低確率で枝刈り済み）
+              continue;
+            }
+
+            const std::vector<SparseTransitionInfo>& valid_transitions = sparse_it->second;
+
+            // 【置換された計算】Q×Q×k ループ → 有効遷移のみをループ
+            for (const SparseTransitionInfo& trans : valid_transitions) {
+              int e1 = trans.next_e;
+              // int k1 = trans.next_k; // k1は後続処理で必要になった場合に使用
+
+              for (int d1 = Dmin; d1 <= Dmax; d1++) {
+                // 観測確率の計算
                 int Nu2 = Nu + d1 - d0;
                 int iL = idx * Nu + d0;
                 double obs_prob = ComputeExtendedObservationProbability(idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
-                double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
-                double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
-                double p_k0 = 1.0 / num_kmers;
 
-                transition_prob_sum += p_k0 * obs_prob * prior_prob * trans_prob;
+                // 事前確率の計算
+                double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
+
+                // 全確率の計算（事前計算済み遷移確率を使用）
+                double prob_component = obs_prob * prior_prob * trans.prob * p_k0;
+
+                // 結果に累積
+                TempFwdMsg[d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * prob_component;
               }
             }
           }
-
-          TempFwdMsg[d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * transition_prob_sum;
         }
       }
     }
@@ -2162,6 +2188,102 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
 
   printf("# Dec3: CalcForwardMsgBeam[%d] completed | beam_states=%lu/%d\n",
          idx, next_states.size(), beam_width);
+}
+
+//================================================================================
+// 【スパース遷移行列】静的枝刈りによる事前計算（修正版）
+// 純粋な遷移確率 P(e₁|e₀,k₀,xi,xi_next) の枝刈りに専念
+// 計算量を現実的なレベルに削減: O(E²·K·Q²) ≈ 4²·256·1152² ≈ 3.4×10⁹
+//================================================================================
+void SLFBAdec::PrecomputeSparseTransitions(double threshold) {
+  if (precomputation_done) return;
+
+  printf("# PrecomputeSparseTransitions: Starting with threshold=%.2e\n", threshold);
+  printf("# Expected iterations: %d (E²=%d, K=%d, Q²=%d)\n",
+         NUM_ERROR_STATES * num_kmers * Q * Q,
+         NUM_ERROR_STATES, num_kmers, Q * Q);
+  fflush(stdout);
+
+  sparse_transitions.clear();
+  int total_evaluated = 0;
+  int kept_transitions = 0;
+
+  // 純粋な遷移確率の枝刈り（dに依存しない）
+  for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+    printf("  Processing error state e0=%d/%d...\n", e0, NUM_ERROR_STATES-1);
+
+    for (int k0 = 0; k0 < num_kmers; k0++) {
+      for (int xi = 0; xi < Q; xi++) {
+        for (int xi_next = 0; xi_next < Q; xi_next++) {
+
+          auto key = std::make_tuple(e0, k0, xi, xi_next);
+          std::vector<SparseTransitionInfo> valid_transitions;
+
+          // 全てのエラー状態遷移先を評価
+          for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+            total_evaluated++;
+
+            // 遷移確率を計算（メモ化キャッシュ使用）
+            double trans_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+
+            if (trans_prob >= threshold) {
+              // k-mer状態の更新（決定論的）
+              int k1 = ComputeExtendedKmer(k0, xi, xi_next, 0);
+
+              SparseTransitionInfo info;
+              info.next_e = e1;
+              info.next_k = k1;
+              info.prob = trans_prob;
+              valid_transitions.push_back(info);
+              kept_transitions++;
+            }
+          }
+
+          // 有効な遷移がある場合のみマップに登録
+          if (!valid_transitions.empty()) {
+            // 確率順でソート（高確率遷移を優先）
+            std::sort(valid_transitions.begin(), valid_transitions.end(),
+                      [](const SparseTransitionInfo& a, const SparseTransitionInfo& b) {
+                        return a.prob > b.prob;
+                      });
+            sparse_transitions[key] = valid_transitions;
+          }
+        }
+      }
+
+      // 進捗表示（k0単位で）
+      if (k0 % 32 == 0 || k0 == num_kmers - 1) {
+        double progress = double(e0 * num_kmers + k0 + 1) / (NUM_ERROR_STATES * num_kmers) * 100.0;
+        printf("    -> Progress: [%.1f%%] k0=%d/%d\n", progress, k0, num_kmers-1);
+        fflush(stdout);
+      }
+    }
+  }
+
+  precomputation_done = true;
+
+  printf("# PrecomputeSparseTransitions completed:\n");
+  printf("#   Total evaluated transitions: %d\n", total_evaluated);
+  printf("#   Kept high-probability transitions: %d (%.2f%%)\n",
+         kept_transitions, 100.0 * kept_transitions / total_evaluated);
+  printf("#   Unique transition patterns: %zu\n", sparse_transitions.size());
+
+  // 統計情報
+  if (!sparse_transitions.empty()) {
+    size_t min_trans = SIZE_MAX, max_trans = 0, total_kept = 0;
+    for (const auto& kv : sparse_transitions) {
+      size_t trans_count = kv.second.size();
+      min_trans = std::min(min_trans, trans_count);
+      max_trans = std::max(max_trans, trans_count);
+      total_kept += trans_count;
+    }
+
+    printf("#   Average transitions per pattern: %.1f\n",
+           double(total_kept) / sparse_transitions.size());
+    printf("#   Min/Max transitions per pattern: %zu/%zu\n", min_trans, max_trans);
+  }
+
+  fflush(stdout);
 }
 
 //================================================================================
