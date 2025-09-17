@@ -637,7 +637,8 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   } else {
     beam_width = DEFAULT_BEAM_WIDTH;
   }
-  printf("# SLFBAdec: Beam Search enabled with width = %d\n", beam_width);
+  printf("# SLFBAdec: Beam Search enabled with width = %zu\n", beam_width);
+
 
   // スパース遷移行列の初期化
   precomputation_done = false;
@@ -1998,7 +1999,7 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
 //================================================================================
 void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
-  printf("# Dec3: CalcForwardMsg[%d] with Beam Search (Width=%d)...\n", idx, beam_width);
+  printf("# Dec3: CalcForwardMsg[%d] with Beam Search (Width=%zu)...\n", idx, beam_width);
   fflush(stdout);
 
   // ①-1. 次の時刻 t+1 の全状態の確率を一時的に計算・蓄積するための配列
@@ -2088,7 +2089,7 @@ void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
 //================================================================================
 void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
-  printf("# Dec3: CalcForwardMsgBeam[%d] with Beam Search (Width=%d)...\n", idx, beam_width);
+  printf("# Dec3: CalcForwardMsgBeam[%d] with Beam Search (Width=%zu)...\n", idx, beam_width);
   fflush(stdout);
 
   // ①-1. 一時配列で全状態の確率を計算
@@ -2188,7 +2189,7 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
     }
   }
 
-  printf("# Dec3: CalcForwardMsgBeam[%d] completed | beam_states=%lu/%d\n",
+  printf("# Dec3: CalcForwardMsgBeam[%d] completed | beam_states=%lu/%zu\n",
          idx, next_states.size(), beam_width);
 }
 
