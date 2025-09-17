@@ -116,7 +116,8 @@ private:
   void PrecomputeSparseTransitions(double threshold = 1e-6); // 静的枝刈りによるスパース遷移行列の事前計算
 
   // ビームサーチパラメータ
-  int beam_width;                            // ビーム幅（環境変数またはデフォルト値で設定）
+  // int beam_width;  
+  size_t beam_width; 
 
   // 【スパース遷移行列】計算量削減用データ構造（修正版）
   // 1つの「高確率な遷移先」の情報
