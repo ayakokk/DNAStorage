@@ -1,5 +1,8 @@
 #include <map>
 #include <tuple>
+#include <vector>
+#include <map>
+#include <tuple>
 class SLFBAdec {
 private:
   // エラー状態定数
