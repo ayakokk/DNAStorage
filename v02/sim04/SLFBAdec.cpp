@@ -2002,7 +2002,8 @@ void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
   fflush(stdout);
 
   // ①-1. 次の時刻 t+1 の全状態の確率を一時的に計算・蓄積するための配列
-  double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  std::vector<std::vector<double>> TempFwdMsg(Drng, std::vector<double>(NUM_ERROR_STATES, 0.0));
+  // double TempFwdMsg[Drng][NUM_ERROR_STATES];
   for (int d = 0; d < Drng; d++) {
     for (int e = 0; e < NUM_ERROR_STATES; e++) {
       TempFwdMsg[d][e] = 0.0;
@@ -2091,7 +2092,8 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
   fflush(stdout);
 
   // ①-1. 一時配列で全状態の確率を計算
-  double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  // double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  std::vector<std::vector<double>> TempFwdMsg(Drng, std::vector<double>(NUM_ERROR_STATES, 0.0));
   for (int d = 0; d < Drng; d++) {
     for (int e = 0; e < NUM_ERROR_STATES; e++) {
       TempFwdMsg[d][e] = 0.0;

@@ -1,8 +1,6 @@
 #include <map>
 #include <tuple>
 #include <vector>
-#include <map>
-#include <tuple>
 class SLFBAdec {
 private:
   // エラー状態定数
@@ -26,12 +24,6 @@ private:
   double **PU, **PD;    // [Ns][Q]:      FG up/down
   double **PI, **PO;    // [Ns][Q]:      FG input/output
   unsigned char *Yin;   // [Nb+Dmax]: received word
-  // k-mer窓の管理（論文の⌊k/v⌋に対応）
-  int kmer_window_size;  // = ⌊k/v⌋ + 2 (現在と次の符号語を含む)
-  
-  // 複数時刻の符号語を保持するバッファ
-  int* codeword_history;  // [kmer_window_size]: 過去の符号語インデックス
-  
   // エラー状態関連データ構造 (3D)
   double ***PFE, ***PBE; // [Ns+1][Drng][NUM_ERROR_STATES]: エラー状態を含む前進/後進確率
   double ***PE;          // [Ns][NUM_ERROR_STATES][NUM_ERROR_STATES]: エラー状態遷移確率
@@ -119,7 +111,6 @@ private:
 
   // 【ビームサーチ版】計算量削減メソッド
   void CalcForwardMsgBeam(int idx, int Nb2); // ビームサーチ版前向きメッセージ計算
-  void CalcBackwardMsgBeam(int idx, int Nb2);// ビームサーチ版後ろ向きメッセージ計算
 
   // 【スパース遷移行列】静的枝刈り関数
   void PrecomputeSparseTransitions(double threshold = 1e-6); // 静的枝刈りによるスパース遷移行列の事前計算
@@ -149,8 +140,8 @@ private:
   double GetExtendedKmerErrorProb(int prev_error, int prev_kmer, int xi_current, int xi_next, int next_error);
   double ComputeExtendedObservationProbability(int idx, int Nu2, int iL, int xi_current, int xi_next, int k0, int e0, int Nb2);
   
-  // 複数符号語系列を考慮した観測確率計算
-  double CalcPyx_dynamic_extended(long y, long x, int ly, int lx, int prev_error, int kmer, int xi_current, int xi_next);
+  // 複数符号語系列を考慮した観測確率計算（現在未使用）
+  // double CalcPyx_dynamic_extended(long y, long x, int ly, int lx, int prev_error, int kmer, int xi_current, int xi_next);
   
 
   // ✅ CalcPxy_dynamicの計算結果をキャッシュするマップ
