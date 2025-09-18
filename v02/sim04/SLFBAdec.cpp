@@ -2289,6 +2289,138 @@ void SLFBAdec::PrecomputeSparseTransitions(double threshold) {
   fflush(stdout);
 }
 
+// in SLFBAdec.cpp
+
+//================================================================================
+// 【デバッグ用】スパース遷移行列の内容をファイルに出力
+//================================================================================
+void SLFBAdec::ExportSparseTransitions(const char* filename) const {
+    if (!precomputation_done) {
+        printf("# Error: Cannot export sparse transitions because precomputation is not done.\n");
+        return;
+    }
+
+    printf("# Exporting sparse transition list to %s ...\n", filename);
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        printf("# Error: Cannot open file %s for writing.\n", filename);
+        return;
+    }
+
+    fprintf(file, "# Sparse Transition List\n");
+    fprintf(file, "# Total transition patterns found: %zu\n", sparse_transitions.size());
+    fprintf(file, "# Format: (e0, k0, xi, xi_next) -> [next_e, next_k, probability]\n\n");
+
+    for (const auto& kv : sparse_transitions) {
+        const auto& key = kv.first;
+        const auto& transitions = kv.second;
+
+        // 遷移元のキーを出力
+        fprintf(file, "(e₀=%d, k₀=%d, xi=%d, xi_next=%d) -> %zu transitions\n",
+                std::get<0>(key), std::get<1>(key), std::get<2>(key), std::get<3>(key),
+                transitions.size());
+
+        // 遷移先のリストを出力
+        for (const auto& trans : transitions) {
+            fprintf(file, "  -> (e₁=%d, k₁=%d) | prob=%.6e\n",
+                    trans.next_e, trans.next_k, trans.prob);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+    printf("# Export complete.\n");
+}
+
+//================================================================================
+// 【キャッシュ機能】スパース遷移行列をファイルに保存
+//================================================================================
+void SLFBAdec::SaveSparseTransitions(const char* filename) const {
+  printf("# Caching: Saving sparse transition list to %s ...\n", filename);
+  FILE* file = fopen(filename, "wb"); // "wb" = write binary
+  if (!file) {
+    printf("# Error: Cannot open cache file %s for writing.\n", filename);
+    return;
+  }
+
+  // 1. マップのエントリ数を書き込む
+  size_t map_size = sparse_transitions.size();
+  fwrite(&map_size, sizeof(size_t), 1, file);
+
+  // 2. 各エントリを書き込む
+  for (const auto& kv : sparse_transitions) {
+    // キーを書き込む
+    fwrite(&kv.first, sizeof(std::tuple<int, int, int, int>), 1, file);
+
+    // ベクターのサイズを書き込む
+    size_t vec_size = kv.second.size();
+    fwrite(&vec_size, sizeof(size_t), 1, file);
+
+    // ベクターの中身を書き込む
+    fwrite(kv.second.data(), sizeof(SparseTransitionInfo), vec_size, file);
+  }
+
+  fclose(file);
+  printf("# Caching: Save complete. %zu patterns cached.\n", map_size);
+}
+
+//================================================================================
+// 【キャッシュ機能】ファイルからスパース遷移行列を読み込む
+//================================================================================
+bool SLFBAdec::LoadSparseTransitions(const char* filename) {
+  printf("# Caching: Attempting to load sparse transitions from %s ...\n", filename);
+  FILE* file = fopen(filename, "rb"); // "rb" = read binary
+  if (!file) {
+    printf("# Caching: Cache file not found. Precomputation will be required.\n");
+    return false;
+  }
+
+  sparse_transitions.clear();
+
+  // 1. マップのエントリ数を読み込む
+  size_t map_size;
+  if (fread(&map_size, sizeof(size_t), 1, file) != 1) {
+    printf("# Caching: Error reading cache file header.\n");
+    fclose(file);
+    return false;
+  }
+
+  // 2. 各エントリを読み込む
+  for (size_t i = 0; i < map_size; ++i) {
+    // キーを読み込む
+    std::tuple<int, int, int, int> key;
+    if (fread(&key, sizeof(std::tuple<int, int, int, int>), 1, file) != 1) {
+      printf("# Caching: Error reading key at entry %zu.\n", i);
+      fclose(file);
+      return false;
+    }
+
+    // ベクターのサイズを読み込む
+    size_t vec_size;
+    if (fread(&vec_size, sizeof(size_t), 1, file) != 1) {
+      printf("# Caching: Error reading vector size at entry %zu.\n", i);
+      fclose(file);
+      return false;
+    }
+
+    // ベクターを準備して中身を読み込む
+    std::vector<SparseTransitionInfo> transitions(vec_size);
+    if (fread(transitions.data(), sizeof(SparseTransitionInfo), vec_size, file) != vec_size) {
+      printf("# Caching: Error reading transition data at entry %zu.\n", i);
+      fclose(file);
+      return false;
+    }
+
+    // マップに格納
+    sparse_transitions[key] = transitions;
+  }
+
+  fclose(file);
+  precomputation_done = true;
+  printf("# Caching: Successfully loaded %zu patterns from cache.\n", map_size);
+  return true;
+}
+
 //================================================================================
 // 【核心】4次元後進確率計算 - 前進後進アルゴリズムの後進ステップ
 // 逆方向に状態確率を伝播: P_B(d_t, e_t, η_t) = Σ P_B(d_{t+1}, e_{t+1}, η_{t+1}) × 遷移確率

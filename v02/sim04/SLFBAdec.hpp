@@ -112,8 +112,7 @@ private:
   // 【ビームサーチ版】計算量削減メソッド
   void CalcForwardMsgBeam(int idx, int Nb2); // ビームサーチ版前向きメッセージ計算
 
-  // 【スパース遷移行列】静的枝刈り関数
-  void PrecomputeSparseTransitions(double threshold = 1e-6); // 静的枝刈りによるスパース遷移行列の事前計算
+  
 
   // ビームサーチパラメータ
   // int beam_width;  
@@ -166,5 +165,13 @@ public:
   void ClearTransitionProbCache();          // キャッシュクリア（メモリ解放）
   void ExportTransitionProbCache(const char* filename) const;          // キャッシュ内容をファイル出力（デバッグ用）
   void LoadKmerErrorProbabilities(const char* dir_path); // DNArSim-mainから P(e_{t+1}|e_t,η_{t+1}) を読み込み（公開API）
+  void ExportSparseTransitions(const char* filename) const;
+
+  // 【キャッシュ機能】スパース遷移行列の保存・読み込み
+  void SaveSparseTransitions(const char* filename) const;
+  bool LoadSparseTransitions(const char* filename);
+  // 【スパース遷移行列】静的枝刈り関数
+  void PrecomputeSparseTransitions(double threshold = 1e-6); // 静的枝刈りによるスパース遷移行列の事前計算
+
  
 };

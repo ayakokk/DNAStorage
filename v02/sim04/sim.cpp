@@ -250,6 +250,37 @@ int main(int argc, char *argv[]){
   int wc;
   long ec,ecmax=0,es=0;  // Error counting for BER calculation
   
+  // ▼▼▼【ここからコードを挿入】▼▼▼
+  const char* decoder_mode = getenv("DECODER_MODE");
+  if (decoder_mode == nullptr) {
+      decoder_mode = "DEC3"; // デフォルトをDEC3に
+  }
+
+  // DEC3モードの場合のみ、スパース遷移行列の準備（キャッシュ機能付き）
+  if (strcmp(decoder_mode, "DEC3") == 0) {
+      // キャッシュファイル名を生成（閾値に応じてファイル名が変わる）
+      char cache_filename[256];
+      snprintf(cache_filename, sizeof(cache_filename), "sparse_transitions_thresh_%.0e.cache", sparse_threshold);
+
+      printf("# [INFO] Setting up sparse transition matrices for DEC3 performance optimization...\n");
+
+      // 1. まずキャッシュの読み込みを試す
+      if (!DEC->LoadSparseTransitions(cache_filename)) {
+          // 2. 失敗した場合のみ、事前計算を実行
+          printf("# [INFO] No cache found. Precomputing sparse transition matrices...\n");
+          DEC->PrecomputeSparseTransitions(sparse_threshold);
+
+          // 3. 計算結果を次のために保存
+          DEC->SaveSparseTransitions(cache_filename);
+          printf("# [INFO] Cache saved for future use.\n");
+      } else {
+          printf("# [INFO] Using cached sparse transition matrices. Precomputation skipped.\n");
+      }
+
+      //【確認用】作成したスパース行列をファイルに出力
+      DEC->ExportSparseTransitions("sparse_transitions_result.txt");
+  }
+// ▲▲▲【ここまでコードを挿入】▲▲▲
   //===== Dec3 BER Performance Test Loop =====
   printf("# Starting Dec3 BER performance evaluation with %d test words\n", WCmax);
   for(wc=1;wc<=WCmax;wc++){
