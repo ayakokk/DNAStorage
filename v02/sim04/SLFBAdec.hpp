@@ -1,6 +1,9 @@
 #include <map>
 #include <tuple>
 #include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
 class SLFBAdec {
 private:
   // エラー状態定数
@@ -118,7 +121,7 @@ private:
   // int beam_width;  
   size_t beam_width; 
 
-  // 【スパース遷移行列】計算量削減用データ構造（修正版）
+  // 【動的枝刈りメモ化】計算量削減用データ構造
   // 1つの「高確率な遷移先」の情報
   struct SparseTransitionInfo {
     int next_e;     // 到達点のエラー状態 e₁
@@ -126,10 +129,10 @@ private:
     double prob;    // 遷移確率 P(e₁ | e₀, k₀, xi, xi_next)
   };
 
-  // スパース遷移リストのマップ
-  // キー: tuple(e₀, k₀, xi, xi_next) -> 値: 遷移先リスト
-  std::map<std::tuple<int, int, int, int>, std::vector<SparseTransitionInfo>> sparse_transitions;
-  bool precomputation_done;
+  // 動的キャッシュ: 遷移先リストをオンデマンドで計算・保存
+  // キー: tuple(e₀, k₀, xi, xi_next) -> 値: 高確率遷移先リスト
+  using SparseTransitionCache = std::map<std::tuple<int, int, int, int>, std::vector<SparseTransitionInfo>>;
+  SparseTransitionCache sparse_transition_cache;
 
   // 【互換性用】既存4次元計算メソッド（段階的移行用）
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
@@ -148,6 +151,11 @@ private:
   // キー: <y, x, ly, lx, prev_e, kmer, xi> の組み合わせ
   // 値: 計算結果のdouble値
   std::map<std::tuple<long, long, int, int, int, int, int>, double> pyx_cache;
+
+  // 【監視システム】Mutex と監視スレッド制御
+  mutable std::mutex cache_mutex;          // transition_prob_cache への排他制御
+  std::atomic<bool> monitoring_active;     // 監視スレッドの動作制御
+  std::thread monitoring_thread;           // 監視スレッドのハンドル
 public:
   SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class IDSchannel *_CH);
   ~SLFBAdec();
@@ -160,8 +168,7 @@ public:
   void exportGXTable(const char* filename);
   void exportAllTables(const char* output_dir);
 
-  // メモ化遷移確率関数（メモリ効率版）
-  double GetOrComputeTransitionProb(int e0, int k0, int xi, int xi_next, int e1); // オンデマンド計算＋メモ化
+  // メモ化遷移確率関数（メモリ効率版） - removed, using GetValidTransitions instead
   void ClearTransitionProbCache();          // キャッシュクリア（メモリ解放）
   void ExportTransitionProbCache(const char* filename) const;          // キャッシュ内容をファイル出力（デバッグ用）
   void LoadKmerErrorProbabilities(const char* dir_path); // DNArSim-mainから P(e_{t+1}|e_t,η_{t+1}) を読み込み（公開API）
@@ -170,8 +177,13 @@ public:
   // 【キャッシュ機能】スパース遷移行列の保存・読み込み
   void SaveSparseTransitions(const char* filename) const;
   bool LoadSparseTransitions(const char* filename);
-  // 【スパース遷移行列】静的枝刈り関数
-  void PrecomputeSparseTransitions(double threshold = 1e-6); // 静的枝刈りによるスパース遷移行列の事前計算
+
+  // 【監視システム】リアルタイムキャッシュ監視機能
+  void StartCacheMonitoring(const char* snapshot_filename = "cache_snapshot.txt", int interval_seconds = 30);
+  void StopCacheMonitoring();
+
+  // 【動的枝刈りメモ化】新しい核心関数
+  const std::vector<SparseTransitionInfo>& GetValidTransitions(int e0, int k0, int xi, int xi_next, double threshold = 1e-6);
 
  
 };

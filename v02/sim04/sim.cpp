@@ -268,7 +268,7 @@ int main(int argc, char *argv[]){
       if (!DEC->LoadSparseTransitions(cache_filename)) {
           // 2. 失敗した場合のみ、事前計算を実行
           printf("# [INFO] No cache found. Precomputing sparse transition matrices...\n");
-          DEC->PrecomputeSparseTransitions(sparse_threshold);
+          // PrecomputeSparseTransitions removed - using dynamic computation
 
           // 3. 計算結果を次のために保存
           DEC->SaveSparseTransitions(cache_filename);
@@ -279,6 +279,9 @@ int main(int argc, char *argv[]){
 
       //【確認用】作成したスパース行列をファイルに出力
       DEC->ExportSparseTransitions("sparse_transitions_result.txt");
+
+      // 【監視システム】リアルタイムキャッシュ監視を開始
+      DEC->StartCacheMonitoring("cache_snapshot.txt", 30); // 30秒間隔でスナップショット
   }
 // ▲▲▲【ここまでコードを挿入】▲▲▲
   //===== Dec3 BER Performance Test Loop =====
@@ -338,6 +341,13 @@ int main(int argc, char *argv[]){
   } // for wc
   //-----
   //DCM->PrintCnt();
+
+  // 【監視システム】キャッシュ監視を停止
+  if (strcmp(decoder_mode, "DEC3") == 0) {
+    DEC->StopCacheMonitoring();
+    printf("# Final cache export...\n");
+    DEC->ExportTransitionProbCache("final_transition_cache.txt");
+  }
 
   // Shutdown DNA server
   if(g_dna_server){

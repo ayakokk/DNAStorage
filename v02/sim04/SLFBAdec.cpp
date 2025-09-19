@@ -35,6 +35,10 @@ DNA データストレージシステム用の制約符号デコーダー実装
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <chrono>
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -641,7 +645,10 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
 
 
   // スパース遷移行列の初期化
-  precomputation_done = false;
+  // precomputation_done flag removed - using dynamic computation
+
+  // 監視システムの初期化
+  monitoring_active = false;
 
   // メモ化キャッシュの初期化（自動的に空のmapとして初期化される）
   // transition_prob_cache は自動初期化
@@ -694,6 +701,9 @@ SLFBAdec::~SLFBAdec(){
   DelFGE();
   DelFGE4D();  // Dec3: 4次元ラティスメモリ解放
 
+  // 監視スレッドの適切な停止
+  StopCacheMonitoring();
+
   // メモ化キャッシュのクリア
   transition_prob_cache.clear();
 
@@ -744,7 +754,7 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
 
     // 【スパース遷移行列】高速化のための事前計算
     printf("# Dec3: Precomputing sparse transition matrices for performance optimization...\n");
-    PrecomputeSparseTransitions(sparse_threshold);  // 引数で指定された閾値以下の遷移を枝刈り
+    // PrecomputeSparseTransitions removed - using dynamic computation
 
     // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算（ビームサーチ版）
     printf("# Dec3: Starting separated approach with Beam Search: horizontal messages + vertical computation\n");
@@ -1939,7 +1949,7 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
                 // double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
 
                 // 改善: メモ化によるオンデマンド計算（メモリ効率版）
-                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
                 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
                 
                 // 次の符号語の事前確率も考慮
@@ -2113,16 +2123,11 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
         for (int xi = 0; xi < Q; xi++) {
           for (int xi_next = 0; xi_next < Q; xi_next++) {
 
-            // 【高速化の核心】スパース遷移リストを取得
-            auto key = std::make_tuple(e0, k0, xi, xi_next);
-            auto sparse_it = sparse_transitions.find(key);
+            // 【動的枝刈り】高確率な遷移先のリストを動的に取得（計算orキャッシュ）
+            const auto& valid_transitions = GetValidTransitions(e0, k0, xi, xi_next, 1e-6);
 
-            if (sparse_it == sparse_transitions.end()) {
-              // 有効な遷移がない場合はスキップ（低確率で枝刈り済み）
-              continue;
-            }
-
-            const std::vector<SparseTransitionInfo>& valid_transitions = sparse_it->second;
+            // 取得したリストが空なら、この先の計算は不要
+            if (valid_transitions.empty()) continue;
 
             // 【置換された計算】Q×Q×k ループ → 有効遷移のみをループ
             for (const SparseTransitionInfo& trans : valid_transitions) {
@@ -2198,95 +2203,37 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
 // 純粋な遷移確率 P(e₁|e₀,k₀,xi,xi_next) の枝刈りに専念
 // 計算量を現実的なレベルに削減: O(E²·K·Q²) ≈ 4²·256·1152² ≈ 3.4×10⁹
 //================================================================================
-void SLFBAdec::PrecomputeSparseTransitions(double threshold) {
-  if (precomputation_done) return;
 
-  printf("# PrecomputeSparseTransitions: Starting with threshold=%.2e\n", threshold);
-  printf("# Expected iterations: %d (E²=%d, K=%d, Q²=%d)\n",
-         NUM_ERROR_STATES * num_kmers * Q * Q,
-         NUM_ERROR_STATES, num_kmers, Q * Q);
-  fflush(stdout);
+//================================================================================
+// 【新核心関数】動的な枝刈りを伴うメモ化
+// (e₀,k₀,xi,xi_next)から始まる高確率な遷移リストを動的に計算・キャッシュする
+//================================================================================
+const std::vector<SLFBAdec::SparseTransitionInfo>& SLFBAdec::GetValidTransitions(int e0, int k0, int xi, int xi_next, double threshold) {
+    auto key = std::make_tuple(e0, k0, xi, xi_next);
 
-  sparse_transitions.clear();
-  int total_evaluated = 0;
-  int kept_transitions = 0;
+    // 1. まずキャッシュにキーが存在するか確認
+    auto it = sparse_transition_cache.find(key);
+    if (it != sparse_transition_cache.end()) {
+        // あればキャッシュからリストを返す
+        return it->second;
+    }
 
-  // 純粋な遷移確率の枝刈り（dに依存しない）
-  for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
-    printf("  Processing error state e0=%d/%d...\n", e0, NUM_ERROR_STATES-1);
+    // 2. キャッシュにない場合、その場で計算してリストを作成
+    std::vector<SparseTransitionInfo> valid_transitions;
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+        // GetExtendedKmerErrorProb は内部でk₁を計算し、基本的なエラー確率を返す
+        double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
 
-    for (int k0 = 0; k0 < num_kmers; k0++) {
-      for (int xi = 0; xi < Q; xi++) {
-        for (int xi_next = 0; xi_next < Q; xi_next++) {
-
-          auto key = std::make_tuple(e0, k0, xi, xi_next);
-          std::vector<SparseTransitionInfo> valid_transitions;
-
-          // 全てのエラー状態遷移先を評価
-          for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-            total_evaluated++;
-
-            // 遷移確率を計算（メモ化キャッシュ使用）
-            double trans_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
-
-            if (trans_prob >= threshold) {
-              // k-mer状態の更新（決定論的）
-              int k1 = ComputeExtendedKmer(k0, xi, xi_next, 0);
-
-              SparseTransitionInfo info;
-              info.next_e = e1;
-              info.next_k = k1;
-              info.prob = trans_prob;
-              valid_transitions.push_back(info);
-              kept_transitions++;
-            }
-          }
-
-          // 有効な遷移がある場合のみマップに登録
-          if (!valid_transitions.empty()) {
-            // 確率順でソート（高確率遷移を優先）
-            std::sort(valid_transitions.begin(), valid_transitions.end(),
-                      [](const SparseTransitionInfo& a, const SparseTransitionInfo& b) {
-                        return a.prob > b.prob;
-                      });
-            sparse_transitions[key] = valid_transitions;
-          }
+        // 【動的枝刈り】計算した確率が閾値以上か判定
+        if (trans_prob >= threshold) {
+            int k1 = ComputeExtendedKmer(k0, xi, xi_next, 0);
+            valid_transitions.push_back({e1, k1, trans_prob});
         }
-      }
-
-      // 進捗表示（k0単位で）
-      if (k0 % 32 == 0 || k0 == num_kmers - 1) {
-        double progress = double(e0 * num_kmers + k0 + 1) / (NUM_ERROR_STATES * num_kmers) * 100.0;
-        printf("    -> Progress: [%.1f%%] k0=%d/%d\n", progress, k0, num_kmers-1);
-        fflush(stdout);
-      }
-    }
-  }
-
-  precomputation_done = true;
-
-  printf("# PrecomputeSparseTransitions completed:\n");
-  printf("#   Total evaluated transitions: %d\n", total_evaluated);
-  printf("#   Kept high-probability transitions: %d (%.2f%%)\n",
-         kept_transitions, 100.0 * kept_transitions / total_evaluated);
-  printf("#   Unique transition patterns: %zu\n", sparse_transitions.size());
-
-  // 統計情報
-  if (!sparse_transitions.empty()) {
-    size_t min_trans = SIZE_MAX, max_trans = 0, total_kept = 0;
-    for (const auto& kv : sparse_transitions) {
-      size_t trans_count = kv.second.size();
-      min_trans = std::min(min_trans, trans_count);
-      max_trans = std::max(max_trans, trans_count);
-      total_kept += trans_count;
     }
 
-    printf("#   Average transitions per pattern: %.1f\n",
-           double(total_kept) / sparse_transitions.size());
-    printf("#   Min/Max transitions per pattern: %zu/%zu\n", min_trans, max_trans);
-  }
-
-  fflush(stdout);
+    // 3. 計算結果（空かもしれないリスト）をキャッシュに保存して、その参照を返す
+    sparse_transition_cache[key] = valid_transitions;
+    return sparse_transition_cache[key];
 }
 
 // in SLFBAdec.cpp
@@ -2295,23 +2242,18 @@ void SLFBAdec::PrecomputeSparseTransitions(double threshold) {
 // 【デバッグ用】スパース遷移行列の内容をファイルに出力
 //================================================================================
 void SLFBAdec::ExportSparseTransitions(const char* filename) const {
-    if (!precomputation_done) {
-        printf("# Error: Cannot export sparse transitions because precomputation is not done.\n");
-        return;
-    }
-
-    printf("# Exporting sparse transition list to %s ...\n", filename);
+    printf("# Exporting dynamic sparse transition cache to %s ...\n", filename);
     FILE* file = fopen(filename, "w");
     if (!file) {
         printf("# Error: Cannot open file %s for writing.\n", filename);
         return;
     }
 
-    fprintf(file, "# Sparse Transition List\n");
-    fprintf(file, "# Total transition patterns found: %zu\n", sparse_transitions.size());
+    fprintf(file, "# Dynamic Sparse Transition Cache\n");
+    fprintf(file, "# Total cached transition patterns: %zu\n", sparse_transition_cache.size());
     fprintf(file, "# Format: (e0, k0, xi, xi_next) -> [next_e, next_k, probability]\n\n");
 
-    for (const auto& kv : sparse_transitions) {
+    for (const auto& kv : sparse_transition_cache) {
         const auto& key = kv.first;
         const auto& transitions = kv.second;
 
@@ -2336,89 +2278,91 @@ void SLFBAdec::ExportSparseTransitions(const char* filename) const {
 // 【キャッシュ機能】スパース遷移行列をファイルに保存
 //================================================================================
 void SLFBAdec::SaveSparseTransitions(const char* filename) const {
-  printf("# Caching: Saving sparse transition list to %s ...\n", filename);
-  FILE* file = fopen(filename, "wb"); // "wb" = write binary
-  if (!file) {
-    printf("# Error: Cannot open cache file %s for writing.\n", filename);
-    return;
-  }
-
-  // 1. マップのエントリ数を書き込む
-  size_t map_size = sparse_transitions.size();
-  fwrite(&map_size, sizeof(size_t), 1, file);
-
-  // 2. 各エントリを書き込む
-  for (const auto& kv : sparse_transitions) {
-    // キーを書き込む
-    fwrite(&kv.first, sizeof(std::tuple<int, int, int, int>), 1, file);
-
-    // ベクターのサイズを書き込む
-    size_t vec_size = kv.second.size();
-    fwrite(&vec_size, sizeof(size_t), 1, file);
-
-    // ベクターの中身を書き込む
-    fwrite(kv.second.data(), sizeof(SparseTransitionInfo), vec_size, file);
-  }
-
-  fclose(file);
-  printf("# Caching: Save complete. %zu patterns cached.\n", map_size);
+  printf("# Dynamic computation mode: Cache saving not needed (dynamic memoization is used)\n");
+  printf("# Cache file %s not created - using on-demand computation with memory cache\n", filename);
 }
 
 //================================================================================
 // 【キャッシュ機能】ファイルからスパース遷移行列を読み込む
 //================================================================================
 bool SLFBAdec::LoadSparseTransitions(const char* filename) {
-  printf("# Caching: Attempting to load sparse transitions from %s ...\n", filename);
-  FILE* file = fopen(filename, "rb"); // "rb" = read binary
-  if (!file) {
-    printf("# Caching: Cache file not found. Precomputation will be required.\n");
-    return false;
+  printf("# Dynamic computation mode: No cache loading needed\n");
+  printf("# Cache file %s ignored - using dynamic computation with memoization\n", filename);
+  return false; // Always return false to trigger dynamic computation
+}
+
+//================================================================================
+// 【監視システム】リアルタイムキャッシュ監視の開始
+//================================================================================
+void SLFBAdec::StartCacheMonitoring(const char* snapshot_filename, int interval_seconds) {
+  if (monitoring_active) {
+    printf("# Warning: Cache monitoring is already active.\n");
+    return;
   }
 
-  sparse_transitions.clear();
+  monitoring_active = true;
+  printf("# Starting cache monitoring: %s (every %d seconds)\n", snapshot_filename, interval_seconds);
 
-  // 1. マップのエントリ数を読み込む
-  size_t map_size;
-  if (fread(&map_size, sizeof(size_t), 1, file) != 1) {
-    printf("# Caching: Error reading cache file header.\n");
-    fclose(file);
-    return false;
+  // 監視スレッドを起動
+  monitoring_thread = std::thread([this, snapshot_filename, interval_seconds]() {
+    while (monitoring_active) {
+      std::this_thread::sleep_for(std::chrono::seconds(interval_seconds));
+
+      if (!monitoring_active) break; // 終了チェック
+
+      // スナップショットを出力
+      {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+
+        FILE* file = fopen(snapshot_filename, "w");
+        if (file) {
+          // 現在時刻を取得
+          auto now = std::chrono::system_clock::now();
+          auto time_t = std::chrono::system_clock::to_time_t(now);
+
+          fprintf(file, "# Cache snapshot at: %s", ctime(&time_t));
+          fprintf(file, "# Total cached entries: %zu\n", transition_prob_cache.size());
+          fprintf(file, "# Format: e0, k0, xi, xi_next, e1, probability\n\n");
+
+          // キャッシュの内容を出力（上位100件程度に制限）
+          int count = 0;
+          for (const auto& kv : transition_prob_cache) {
+            if (count >= 100) {
+              fprintf(file, "# ... (%zu more entries)\n", transition_prob_cache.size() - 100);
+              break;
+            }
+
+            const auto& key = kv.first;
+            fprintf(file, "%d, %d, %d, %d, %d, %.8e\n",
+                    std::get<0>(key), std::get<1>(key), std::get<2>(key),
+                    std::get<3>(key), std::get<4>(key), kv.second);
+            count++;
+          }
+
+          fclose(file);
+        }
+      }
+    }
+  });
+}
+
+//================================================================================
+// 【監視システム】リアルタイムキャッシュ監視の停止
+//================================================================================
+void SLFBAdec::StopCacheMonitoring() {
+  if (!monitoring_active) {
+    return; // 既に停止済み
   }
 
-  // 2. 各エントリを読み込む
-  for (size_t i = 0; i < map_size; ++i) {
-    // キーを読み込む
-    std::tuple<int, int, int, int> key;
-    if (fread(&key, sizeof(std::tuple<int, int, int, int>), 1, file) != 1) {
-      printf("# Caching: Error reading key at entry %zu.\n", i);
-      fclose(file);
-      return false;
-    }
+  printf("# Stopping cache monitoring...\n");
+  monitoring_active = false;
 
-    // ベクターのサイズを読み込む
-    size_t vec_size;
-    if (fread(&vec_size, sizeof(size_t), 1, file) != 1) {
-      printf("# Caching: Error reading vector size at entry %zu.\n", i);
-      fclose(file);
-      return false;
-    }
-
-    // ベクターを準備して中身を読み込む
-    std::vector<SparseTransitionInfo> transitions(vec_size);
-    if (fread(transitions.data(), sizeof(SparseTransitionInfo), vec_size, file) != vec_size) {
-      printf("# Caching: Error reading transition data at entry %zu.\n", i);
-      fclose(file);
-      return false;
-    }
-
-    // マップに格納
-    sparse_transitions[key] = transitions;
+  // スレッドが終了するのを待つ
+  if (monitoring_thread.joinable()) {
+    monitoring_thread.join();
   }
 
-  fclose(file);
-  precomputation_done = true;
-  printf("# Caching: Successfully loaded %zu patterns from cache.\n", map_size);
-  return true;
+  printf("# Cache monitoring stopped.\n");
 }
 
 //================================================================================
@@ -2469,7 +2413,7 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
                 if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
 
                 // ▼▼▼【計算量爆発解決】正しい(xi, xi_next)ペアでルックアップ▼▼▼
-                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
                 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 // 次の符号語の事前確率も考慮（CalcPFE4Dと同じ）
@@ -2643,7 +2587,7 @@ void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
 
               for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
                 // ▼▼▼【計算量爆発解決】事前計算テーブル使用▼▼▼
-                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
                 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 // 事後確率の正確な計算（次の符号語の事前確率も考慮）
@@ -2753,36 +2697,15 @@ void SLFBAdec::CalcPosterior(int idx, int Nb2) {
 // オンデマンドで確率を計算し、結果をキャッシュして再利用
 // P(e1|e0, k0, xi, xi_next) の計算とメモ化
 //================================================================================
-double SLFBAdec::GetOrComputeTransitionProb(int e0, int k0, int xi, int xi_next, int e1) {
-  assert(e0 >= 0 && e0 < NUM_ERROR_STATES);
-  assert(k0 >= 0 && k0 < num_kmers);
-  assert(xi >= 0 && xi < Q);
-  assert(xi_next >= 0 && xi_next < Q);
-  assert(e1 >= 0 && e1 < NUM_ERROR_STATES);
-
-  // キャッシュキーを作成
-  std::tuple<int, int, int, int, int> key = std::make_tuple(e0, k0, xi, xi_next, e1);
-
-  // キャッシュに存在するかチェック
-  auto it = transition_prob_cache.find(key);
-  if (it != transition_prob_cache.end()) {
-    // キャッシュヒット：既に計算済み
-    return it->second;
-  }
-
-  // キャッシュミス：新規計算が必要
-  double prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
-
-  // 計算結果をキャッシュに保存
-  transition_prob_cache[key] = prob;
-
-  return prob;
-}
+// GetOrComputeTransitionProb function removed - using dynamic GetValidTransitions instead
 
 //================================================================================
 // メモ化キャッシュのクリア（メモリ解放）
 //================================================================================
 void SLFBAdec::ClearTransitionProbCache() {
+  // 【Mutex保護】キャッシュアクセスを排他制御
+  std::lock_guard<std::mutex> lock(cache_mutex);
+
   size_t cache_size = transition_prob_cache.size();
   transition_prob_cache.clear();
   printf("# Dec3: Transition probability cache cleared (%zu entries freed)\n", cache_size);
@@ -2793,6 +2716,9 @@ void SLFBAdec::ClearTransitionProbCache() {
 // 実際に使用された遷移確率のみを出力（メモリ効率的）
 //================================================================================
 void SLFBAdec::ExportTransitionProbCache(const char* filename) const {
+  // 【Mutex保護】キャッシュアクセスを排他制御
+  std::lock_guard<std::mutex> lock(cache_mutex);
+
   printf("# Dec3: メモ化キャッシュを %s に出力中...\n", filename);
 
   FILE* file = fopen(filename, "w");
