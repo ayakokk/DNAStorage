@@ -39,6 +39,9 @@ DNA データストレージシステム用の制約符号デコーダー実装
 #include <mutex>
 #include <atomic>
 #include <chrono>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -758,7 +761,7 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
 
     // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算（ビームサーチ版）
     printf("# Dec3: Starting separated approach with Beam Search: horizontal messages + vertical computation\n");
-    for(idx=0;   idx<Ns;idx++) CalcForwardMsgBeam(idx,Nb2);     // ビームサーチ版前向きメッセージ(3D)
+    for(idx=0;   idx<Ns;idx++) CalcForwardMsgBeam(idx,Nb2,sparse_threshold);     // ビームサーチ版前向きメッセージ(3D)
     for(idx=Ns-1;idx>=0;idx--) CalcBackwardMsg(idx,Nb2);       // 横方向後ろ向きメッセージ(3D)
     for(idx=0;   idx<Ns;idx++) CalcPosterior(idx,Nb2);      // 縦方向事後確率計算
 
@@ -2097,9 +2100,25 @@ void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
 // 【ビームサーチ版】横方向前向きメッセージ計算
 // 計算量削減のため上位beam_width個の状態のみ保持
 //================================================================================
-void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
+void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2, double sparse_threshold) {
   assert(idx >= 0 && idx < Ns);
-  printf("# Dec3: CalcForwardMsgBeam[%d] with Beam Search (Width=%zu)...\n", idx, beam_width);
+
+  // OpenMPスレッド数を表示（初回のみ）
+  if (idx == 0) {
+    #ifdef _OPENMP
+    #pragma omp parallel
+    {
+      #pragma omp single
+      {
+        printf("# OpenMP: Using %d threads for parallel computation\n", omp_get_num_threads());
+      }
+    }
+    #else
+    printf("# OpenMP: Not available (compiled without OpenMP support)\n");
+    #endif
+  }
+
+  printf("# Dec3: CalcForwardMsgBeam[%d] with Beam Search (Width=%zu) - OpenMP enabled...\n", idx, beam_width);
   fflush(stdout);
 
   // ①-1. 一時配列で全状態の確率を計算
@@ -2111,7 +2130,10 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
     }
   }
 
-  // 2. 【スパース遷移行列】高速化された遷移計算（修正版）
+  // 2. 【OpenMP並列化】スパース遷移行列による高速化計算
+  #ifdef _OPENMP
+  #pragma omp parallel for collapse(2) schedule(dynamic)
+  #endif
   for (int d0 = Dmin; d0 <= Dmax; d0++) {
     for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
       if (FwdMsg[idx][d0 - Dmin][e0] == 0.0) continue;
@@ -2124,7 +2146,7 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
           for (int xi_next = 0; xi_next < Q; xi_next++) {
 
             // 【動的枝刈り】高確率な遷移先のリストを動的に取得（計算orキャッシュ）
-            const auto& valid_transitions = GetValidTransitions(e0, k0, xi, xi_next, 1e-6);
+            const auto& valid_transitions = GetValidTransitions(e0, k0, xi, xi_next, sparse_threshold);
 
             // 取得したリストが空なら、この先の計算は不要
             if (valid_transitions.empty()) continue;
@@ -2146,8 +2168,13 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
                 // 全確率の計算（事前計算済み遷移確率を使用）
                 double prob_component = obs_prob * prior_prob * trans.prob * p_k0;
 
-                // 結果に累積
-                TempFwdMsg[d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * prob_component;
+                // 結果に累積（OpenMPスレッドセーフ）
+                #ifdef _OPENMP
+                #pragma omp critical
+                #endif
+                {
+                  TempFwdMsg[d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * prob_component;
+                }
               }
             }
           }
@@ -2210,6 +2237,9 @@ void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
 //================================================================================
 const std::vector<SLFBAdec::SparseTransitionInfo>& SLFBAdec::GetValidTransitions(int e0, int k0, int xi, int xi_next, double threshold) {
     auto key = std::make_tuple(e0, k0, xi, xi_next);
+
+    // 【OpenMPスレッドセーフ】キャッシュアクセスを排他制御
+    std::lock_guard<std::mutex> lock(cache_mutex);
 
     // 1. まずキャッシュにキーが存在するか確認
     auto it = sparse_transition_cache.find(key);
@@ -2278,17 +2308,88 @@ void SLFBAdec::ExportSparseTransitions(const char* filename) const {
 // 【キャッシュ機能】スパース遷移行列をファイルに保存
 //================================================================================
 void SLFBAdec::SaveSparseTransitions(const char* filename) const {
-  printf("# Dynamic computation mode: Cache saving not needed (dynamic memoization is used)\n");
-  printf("# Cache file %s not created - using on-demand computation with memory cache\n", filename);
+  printf("# Caching: Saving sparse transition cache to %s ...\n", filename);
+  FILE* file = fopen(filename, "wb"); // "wb" = write binary
+  if (!file) {
+    printf("# Error: Cannot open cache file %s for writing.\n", filename);
+    return;
+  }
+
+  // 1. マップのエントリ数を書き込む
+  size_t map_size = sparse_transition_cache.size();
+  fwrite(&map_size, sizeof(size_t), 1, file);
+
+  // 2. 各エントリを書き込む
+  for (const auto& kv : sparse_transition_cache) {
+    // キーを書き込む
+    fwrite(&kv.first, sizeof(std::tuple<int, int, int, int>), 1, file);
+
+    // ベクターのサイズを書き込む
+    size_t vec_size = kv.second.size();
+    fwrite(&vec_size, sizeof(size_t), 1, file);
+
+    // ベクターの中身を書き込む
+    fwrite(kv.second.data(), sizeof(SparseTransitionInfo), vec_size, file);
+  }
+
+  fclose(file);
+  printf("# Caching: Save complete. %zu transition patterns cached.\n", map_size);
 }
 
 //================================================================================
 // 【キャッシュ機能】ファイルからスパース遷移行列を読み込む
 //================================================================================
 bool SLFBAdec::LoadSparseTransitions(const char* filename) {
-  printf("# Dynamic computation mode: No cache loading needed\n");
-  printf("# Cache file %s ignored - using dynamic computation with memoization\n", filename);
-  return false; // Always return false to trigger dynamic computation
+  printf("# Caching: Attempting to load sparse transitions from %s ...\n", filename);
+  FILE* file = fopen(filename, "rb"); // "rb" = read binary
+  if (!file) {
+    printf("# Caching: Cache file not found. Dynamic computation will be used.\n");
+    return false;
+  }
+
+  sparse_transition_cache.clear();
+
+  // 1. マップのエントリ数を読み込む
+  size_t map_size;
+  if (fread(&map_size, sizeof(size_t), 1, file) != 1) {
+    printf("# Caching: Error reading cache file header.\n");
+    fclose(file);
+    return false;
+  }
+
+  // 2. 各エントリを読み込む
+  for (size_t i = 0; i < map_size; ++i) {
+    // キーを読み込む
+    std::tuple<int, int, int, int> key;
+    if (fread(&key, sizeof(std::tuple<int, int, int, int>), 1, file) != 1) {
+      printf("# Caching: Error reading key at entry %zu.\n", i);
+      fclose(file);
+      return false;
+    }
+
+    // ベクターのサイズを読み込む
+    size_t vec_size;
+    if (fread(&vec_size, sizeof(size_t), 1, file) != 1) {
+      printf("# Caching: Error reading vector size at entry %zu.\n", i);
+      fclose(file);
+      return false;
+    }
+
+    // ベクターを準備して中身を読み込む
+    std::vector<SparseTransitionInfo> transitions(vec_size);
+    if (fread(transitions.data(), sizeof(SparseTransitionInfo), vec_size, file) != vec_size) {
+      printf("# Caching: Error reading transition data at entry %zu.\n", i);
+      fclose(file);
+      return false;
+    }
+
+    // マップに格納
+    sparse_transition_cache[key] = transitions;
+  }
+
+  fclose(file);
+  printf("# Caching: Successfully loaded %zu patterns from cache.\n", map_size);
+  return true;
 }
 
 //================================================================================

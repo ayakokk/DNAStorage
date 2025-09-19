@@ -113,7 +113,7 @@ private:
   void CalcPosterior(int idx, int Nb2);      // 縦方向事後確率計算（各時刻での内部計算）
 
   // 【ビームサーチ版】計算量削減メソッド
-  void CalcForwardMsgBeam(int idx, int Nb2); // ビームサーチ版前向きメッセージ計算
+  void CalcForwardMsgBeam(int idx, int Nb2, double sparse_threshold); // ビームサーチ版前向きメッセージ計算
 
   
 

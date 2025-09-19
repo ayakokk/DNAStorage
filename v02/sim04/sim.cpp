@@ -4,6 +4,7 @@
 #include <math.h>
 #include <time.h>
 #include <assert.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -256,31 +257,38 @@ int main(int argc, char *argv[]){
       decoder_mode = "DEC3"; // デフォルトをDEC3に
   }
 
-  // DEC3モードの場合のみ、スパース遷移行列の準備（キャッシュ機能付き）
+  // キャッシュロード状態を追跡する変数
+  bool cache_loaded = false;
+  char cache_filename[512];
+
+  // DEC3モードでは動的計算を使用（事前計算不要）
   if (strcmp(decoder_mode, "DEC3") == 0) {
-      // キャッシュファイル名を生成（閾値に応じてファイル名が変わる）
-      char cache_filename[256];
-      snprintf(cache_filename, sizeof(cache_filename), "sparse_transitions_thresh_%.0e.cache", sparse_threshold);
+      // キャッシュファイル名を主要パラメータを含めて生成（安全性向上）
 
-      printf("# [INFO] Setting up sparse transition matrices for DEC3 performance optimization...\n");
+      // パラメータハッシュを生成して短縮ファイル名も作成
+      uint32_t param_hash = Q ^ (N << 8) ^ (Nu << 16) ^ ((uint32_t)(sparse_threshold * 1e9));
 
-      // 1. まずキャッシュの読み込みを試す
-      if (!DEC->LoadSparseTransitions(cache_filename)) {
-          // 2. 失敗した場合のみ、事前計算を実行
-          printf("# [INFO] No cache found. Precomputing sparse transition matrices...\n");
-          // PrecomputeSparseTransitions removed - using dynamic computation
+      snprintf(cache_filename, sizeof(cache_filename),
+               "cache/sparse_Q%d_N%d_Nu%d_th%.0e_%08x.cache",
+               Q, N, Nu, sparse_threshold, param_hash);
 
-          // 3. 計算結果を次のために保存
-          DEC->SaveSparseTransitions(cache_filename);
-          printf("# [INFO] Cache saved for future use.\n");
+      // キャッシュディレクトリを作成
+      system("mkdir -p cache");
+
+      printf("# [INFO] Dynamic sparse transitions with parameter-specific caching...\n");
+      printf("# [INFO] Cache parameters: Q=%d, N=%d, Nu=%d, threshold=%.0e\n", Q, N, Nu, sparse_threshold);
+
+      // 1. キャッシュ読み込みを試行
+      cache_loaded = DEC->LoadSparseTransitions(cache_filename);
+
+      if (cache_loaded) {
+          printf("# [INFO] Cache loaded successfully - using pre-computed transitions\n");
       } else {
-          printf("# [INFO] Using cached sparse transition matrices. Precomputation skipped.\n");
+          printf("# [INFO] No cache found - will build transitions dynamically\n");
+          printf("# [INFO] Cache will be saved after decoding completion\n");
       }
 
-      //【確認用】作成したスパース行列をファイルに出力
-      DEC->ExportSparseTransitions("sparse_transitions_result.txt");
-
-      // 【監視システム】リアルタイムキャッシュ監視を開始
+      // 2. 【監視システム】リアルタイムキャッシュ監視を開始
       DEC->StartCacheMonitoring("cache_snapshot.txt", 30); // 30秒間隔でスナップショット
   }
 // ▲▲▲【ここまでコードを挿入】▲▲▲
@@ -342,10 +350,22 @@ int main(int argc, char *argv[]){
   //-----
   //DCM->PrintCnt();
 
-  // 【監視システム】キャッシュ監視を停止
+  // 【監視システム】キャッシュ監視を停止とファイナル処理
   if (strcmp(decoder_mode, "DEC3") == 0) {
     DEC->StopCacheMonitoring();
+
+    // 4. デコード完了後、初回実行時のみキャッシュを保存
+    if (!cache_loaded) {
+      printf("# [INFO] Saving dynamically built cache for future use...\n");
+      DEC->SaveSparseTransitions(cache_filename);
+      printf("# [INFO] Cache saved successfully - next execution will be faster\n");
+    } else {
+      printf("# [INFO] Cache was loaded from file - no save needed\n");
+    }
+
+    // 【確認用】最終状態の出力
     printf("# Final cache export...\n");
+    DEC->ExportSparseTransitions("sparse_transitions_result.txt");
     DEC->ExportTransitionProbCache("final_transition_cache.txt");
   }
 

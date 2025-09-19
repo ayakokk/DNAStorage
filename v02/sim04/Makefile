@@ -1,14 +1,42 @@
 # C++コンパイラを指定
 CXX = g++
-# コンパイルフラグを指定
-# メモ化アプローチにより大幅なメモリ効率化を実現（40.5GB → 数KB）
-CXXFLAGS = -Wall -g -fsanitize=address -std=c++11
+
+# デバッグ版（開発用・OpenMPなし）
+CXXFLAGS_DEBUG = -Wall -g -fsanitize=address -std=c++11
+LDFLAGS_DEBUG =
+
+# OpenMP版（デバッグ）
+CXXFLAGS_DEBUG_OMP = -Wall -g -fsanitize=address -std=c++11 -fopenmp
+LDFLAGS_DEBUG_OMP = -fopenmp
+
+# 高性能版（TSUBAME用）
+CXXFLAGS_RELEASE = -Wall -O3 -std=c++11 -fopenmp -DNDEBUG -march=native
+LDFLAGS_RELEASE = -fopenmp
+
+# デフォルトはデバッグ版（OpenMPなし）
+CXXFLAGS = $(CXXFLAGS_DEBUG)
+LDFLAGS = $(LDFLAGS_DEBUG)
 
 # 最終的に生成する実行ファイルを指定
 TARGETS = CBsearch GenEncCM sim test_tables
 
 # 'make' とだけ打った時に 'all' が実行される
 all: $(TARGETS)
+
+# OpenMP版ビルド（ローカルテスト用）
+openmp: clean
+	$(MAKE) CXXFLAGS="$(CXXFLAGS_DEBUG_OMP)" LDFLAGS="$(LDFLAGS_DEBUG_OMP)" $(TARGETS)
+	@echo "# OpenMP build completed for local testing"
+
+# TSUBAME用高性能版ビルド
+release: clean
+	$(MAKE) CXXFLAGS="$(CXXFLAGS_RELEASE)" LDFLAGS="$(LDFLAGS_RELEASE)" $(TARGETS)
+	@echo "# High-performance build completed for TSUBAME"
+
+# OpenMPテスト用（小規模）
+test-openmp: openmp
+	@echo "# Testing OpenMP implementation..."
+	OMP_NUM_THREADS=4 ./sim ICB/ex01-new-4gen/ 3 0
 
 # オブジェクトファイルの依存関係
 OBJS = func.o ChannelMatrix.o InnerCodebook.o IDSchannel.o SLFBAdec.o
@@ -30,16 +58,16 @@ SLFBAdec.o: SLFBAdec.cpp SLFBAdec.hpp InnerCodebook.hpp ChannelMatrix.hpp IDScha
 
 # 実行ファイルの生成ルール
 CBsearch: CBsearch.cpp func.o Makefile
-	$(CXX) $(CXXFLAGS) -o CBsearch func.o CBsearch.cpp
+	$(CXX) $(CXXFLAGS) -o CBsearch func.o CBsearch.cpp $(LDFLAGS)
 
 GenEncCM: GenEncCM.cpp func.o ChannelMatrix.o InnerCodebook.o Makefile
-	$(CXX) $(CXXFLAGS) -o GenEncCM func.o ChannelMatrix.o InnerCodebook.o GenEncCM.cpp
+	$(CXX) $(CXXFLAGS) -o GenEncCM func.o ChannelMatrix.o InnerCodebook.o GenEncCM.cpp $(LDFLAGS)
 
 sim: sim.cpp $(OBJS) Makefile
-	$(CXX) $(CXXFLAGS) -o sim $(OBJS) sim.cpp
+	$(CXX) $(CXXFLAGS) -o sim $(OBJS) sim.cpp $(LDFLAGS)
 
 test_tables: test_tables.cpp $(OBJS) Makefile
-	$(CXX) $(CXXFLAGS) -o test_tables $(OBJS) test_tables.cpp
+	$(CXX) $(CXXFLAGS) -o test_tables $(OBJS) test_tables.cpp $(LDFLAGS)
 
 # クリーンアップルール
 clean:
