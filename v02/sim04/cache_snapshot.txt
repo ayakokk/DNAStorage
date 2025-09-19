@@ -1,0 +1,4 @@
+# Cache snapshot at: Fri Sep 19 09:41:36 2025
+# Total cached entries: 0
+# Format: e0, k0, xi, xi_next, e1, probability
+

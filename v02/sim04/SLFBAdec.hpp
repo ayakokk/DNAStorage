@@ -1,5 +1,9 @@
 #include <map>
 #include <tuple>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <atomic>
 class SLFBAdec {
 private:
   // エラー状態定数
@@ -23,12 +27,6 @@ private:
   double **PU, **PD;    // [Ns][Q]:      FG up/down
   double **PI, **PO;    // [Ns][Q]:      FG input/output
   unsigned char *Yin;   // [Nb+Dmax]: received word
-  // k-mer窓の管理（論文の⌊k/v⌋に対応）
-  int kmer_window_size;  // = ⌊k/v⌋ + 2 (現在と次の符号語を含む)
-  
-  // 複数時刻の符号語を保持するバッファ
-  int* codeword_history;  // [kmer_window_size]: 過去の符号語インデックス
-  
   // エラー状態関連データ構造 (3D)
   double ***PFE, ***PBE; // [Ns+1][Drng][NUM_ERROR_STATES]: エラー状態を含む前進/後進確率
   double ***PE;          // [Ns][NUM_ERROR_STATES][NUM_ERROR_STATES]: エラー状態遷移確率
@@ -114,6 +112,28 @@ private:
   void CalcBackwardMsg(int idx, int Nb2);    // 横方向後ろ向きメッセージ計算（k次元を周辺化）
   void CalcPosterior(int idx, int Nb2);      // 縦方向事後確率計算（各時刻での内部計算）
 
+  // 【ビームサーチ版】計算量削減メソッド
+  void CalcForwardMsgBeam(int idx, int Nb2); // ビームサーチ版前向きメッセージ計算
+
+  
+
+  // ビームサーチパラメータ
+  // int beam_width;  
+  size_t beam_width; 
+
+  // 【動的枝刈りメモ化】計算量削減用データ構造
+  // 1つの「高確率な遷移先」の情報
+  struct SparseTransitionInfo {
+    int next_e;     // 到達点のエラー状態 e₁
+    int next_k;     // 到達点のk-mer状態 k₁
+    double prob;    // 遷移確率 P(e₁ | e₀, k₀, xi, xi_next)
+  };
+
+  // 動的キャッシュ: 遷移先リストをオンデマンドで計算・保存
+  // キー: tuple(e₀, k₀, xi, xi_next) -> 値: 高確率遷移先リスト
+  using SparseTransitionCache = std::map<std::tuple<int, int, int, int>, std::vector<SparseTransitionInfo>>;
+  SparseTransitionCache sparse_transition_cache;
+
   // 【互換性用】既存4次元計算メソッド（段階的移行用）
   void CalcPFE4D(int idx, int Nb2);    // 4次元前進確率計算
   void CalcPBE4D(int idx, int Nb2);    // 4次元後進確率計算
@@ -123,19 +143,24 @@ private:
   double GetExtendedKmerErrorProb(int prev_error, int prev_kmer, int xi_current, int xi_next, int next_error);
   double ComputeExtendedObservationProbability(int idx, int Nu2, int iL, int xi_current, int xi_next, int k0, int e0, int Nb2);
   
-  // 複数符号語系列を考慮した観測確率計算
-  double CalcPyx_dynamic_extended(long y, long x, int ly, int lx, int prev_error, int kmer, int xi_current, int xi_next);
+  // 複数符号語系列を考慮した観測確率計算（現在未使用）
+  // double CalcPyx_dynamic_extended(long y, long x, int ly, int lx, int prev_error, int kmer, int xi_current, int xi_next);
   
 
   // ✅ CalcPxy_dynamicの計算結果をキャッシュするマップ
   // キー: <y, x, ly, lx, prev_e, kmer, xi> の組み合わせ
   // 値: 計算結果のdouble値
   std::map<std::tuple<long, long, int, int, int, int, int>, double> pyx_cache;
+
+  // 【監視システム】Mutex と監視スレッド制御
+  mutable std::mutex cache_mutex;          // transition_prob_cache への排他制御
+  std::atomic<bool> monitoring_active;     // 監視スレッドの動作制御
+  std::thread monitoring_thread;           // 監視スレッドのハンドル
 public:
   SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class IDSchannel *_CH);
   ~SLFBAdec();
-  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin);
-  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW);  // (uniform prior)
+  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin, double sparse_threshold = 1e-6);
+  void Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, double sparse_threshold = 1e-6);  // (uniform prior)
   void PrintNode(int idx, int iw);
   void PrintNode(const int *dbgIW);
   // テーブル出力機能
@@ -143,10 +168,22 @@ public:
   void exportGXTable(const char* filename);
   void exportAllTables(const char* output_dir);
 
-  // メモ化遷移確率関数（メモリ効率版）
-  double GetOrComputeTransitionProb(int e0, int k0, int xi, int xi_next, int e1); // オンデマンド計算＋メモ化
+  // メモ化遷移確率関数（メモリ効率版） - removed, using GetValidTransitions instead
   void ClearTransitionProbCache();          // キャッシュクリア（メモリ解放）
   void ExportTransitionProbCache(const char* filename) const;          // キャッシュ内容をファイル出力（デバッグ用）
   void LoadKmerErrorProbabilities(const char* dir_path); // DNArSim-mainから P(e_{t+1}|e_t,η_{t+1}) を読み込み（公開API）
+  void ExportSparseTransitions(const char* filename) const;
+
+  // 【キャッシュ機能】スパース遷移行列の保存・読み込み
+  void SaveSparseTransitions(const char* filename) const;
+  bool LoadSparseTransitions(const char* filename);
+
+  // 【監視システム】リアルタイムキャッシュ監視機能
+  void StartCacheMonitoring(const char* snapshot_filename = "cache_snapshot.txt", int interval_seconds = 30);
+  void StopCacheMonitoring();
+
+  // 【動的枝刈りメモ化】新しい核心関数
+  const std::vector<SparseTransitionInfo>& GetValidTransitions(int e0, int k0, int xi, int xi_next, double threshold = 1e-6);
+
  
 };

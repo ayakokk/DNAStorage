@@ -1,0 +1,4 @@
+# Dynamic Sparse Transition Cache
+# Total cached transition patterns: 0
+# Format: (e0, k0, xi, xi_next) -> [next_e, next_k, probability]
+

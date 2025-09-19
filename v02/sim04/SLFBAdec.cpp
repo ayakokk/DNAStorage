@@ -34,6 +34,11 @@ DNA データストレージシステム用の制約符号デコーダー実装
 #include <assert.h>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <chrono>
 
 #include "InnerCodebook.hpp"
 #include "ChannelMatrix.hpp"
@@ -41,6 +46,25 @@ DNA データストレージシステム用の制約符号デコーダー実装
 #include "SLFBAdec.hpp"
 
 #define NuMax 10
+
+//================================================================================
+// ビームサーチ用の構造体と定数
+//================================================================================
+
+// 状態とその確率を保持するための構造体
+struct StateInfo {
+    int d;      // ドリフト状態
+    int e;      // エラー状態
+    double prob; // その状態の確率
+
+    // 確率の大きい順（降順）にソートするための比較演算子
+    bool operator<(const StateInfo& other) const {
+        return prob > other.prob;
+    }
+};
+
+// デフォルトビーム幅
+const int DEFAULT_BEAM_WIDTH = 32;
 
 //================================================================================
 // 基本ユーティリティ関数
@@ -606,6 +630,26 @@ SLFBAdec::SLFBAdec(class InnerCodebook *_ICB, class ChannelMatrix *_ECM, class I
   FwdMsg = nullptr;
   BwdMsg = nullptr;
 
+  // ビームサーチパラメータの初期化（環境変数から設定可能）
+  const char* beam_width_str = getenv("BEAM_WIDTH");
+  if (beam_width_str != nullptr) {
+    beam_width = atoi(beam_width_str);
+    if (beam_width <= 0) {
+      beam_width = DEFAULT_BEAM_WIDTH;
+      printf("# Warning: Invalid BEAM_WIDTH environment variable, using default %d\n", DEFAULT_BEAM_WIDTH);
+    }
+  } else {
+    beam_width = DEFAULT_BEAM_WIDTH;
+  }
+  printf("# SLFBAdec: Beam Search enabled with width = %zu\n", beam_width);
+
+
+  // スパース遷移行列の初期化
+  // precomputation_done flag removed - using dynamic computation
+
+  // 監視システムの初期化
+  monitoring_active = false;
+
   // メモ化キャッシュの初期化（自動的に空のmapとして初期化される）
   // transition_prob_cache は自動初期化
   
@@ -657,6 +701,9 @@ SLFBAdec::~SLFBAdec(){
   DelFGE();
   DelFGE4D();  // Dec3: 4次元ラティスメモリ解放
 
+  // 監視スレッドの適切な停止
+  StopCacheMonitoring();
+
   // メモ化キャッシュのクリア
   transition_prob_cache.clear();
 
@@ -664,7 +711,7 @@ SLFBAdec::~SLFBAdec(){
 }
 
 //================================================================================
-void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin){
+void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, const double **Pin, double sparse_threshold){
   int idx;
   assert( Nb2>=Nb+Dmin && Nb2<=Nb+Dmax );
   
@@ -705,17 +752,21 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
     InitFGE4D(RW,Pin,Nb2);  // 4D lattice initialization (includes 3D message arrays)
     for(idx=0;   idx<Ns;idx++) CalcPU(idx);
 
-    // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算
-    printf("# Dec3: Starting separated approach: horizontal messages + vertical computation\n");
-    for(idx=0;   idx<Ns;idx++) CalcForwardMsg(idx,Nb2);     // 横方向前向きメッセージ(3D)
-    for(idx=Ns-1;idx>=0;idx--) CalcBackwardMsg(idx,Nb2);    // 横方向後ろ向きメッセージ(3D)
+    // 【スパース遷移行列】高速化のための事前計算
+    printf("# Dec3: Precomputing sparse transition matrices for performance optimization...\n");
+    // PrecomputeSparseTransitions removed - using dynamic computation
+
+    // 【新アプローチ】分離型計算: 横方向メッセージ + 縦方向計算（ビームサーチ版）
+    printf("# Dec3: Starting separated approach with Beam Search: horizontal messages + vertical computation\n");
+    for(idx=0;   idx<Ns;idx++) CalcForwardMsgBeam(idx,Nb2);     // ビームサーチ版前向きメッセージ(3D)
+    for(idx=Ns-1;idx>=0;idx--) CalcBackwardMsg(idx,Nb2);       // 横方向後ろ向きメッセージ(3D)
     for(idx=0;   idx<Ns;idx++) CalcPosterior(idx,Nb2);      // 縦方向事後確率計算
 
     // 【比較用】既存4次元アプローチ（並行実行で性能比較）
-    printf("# Dec3: Starting traditional 4D approach for comparison\n");
-    for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
-    for(idx=Ns-1;idx>=0;idx--) CalcPBE4D(idx,Nb2);   // 4D後進確率
-    for(idx=0;   idx<Ns;idx++) CalcPDE4D(idx,Nb2);   // 4D事後確率
+    // printf("# Dec3: Starting traditional 4D approach for comparison\n");
+    // for(idx=0;   idx<Ns;idx++) CalcPFE4D(idx,Nb2);   // 4D前進確率
+    // for(idx=Ns-1;idx>=0;idx--) CalcPBE4D(idx,Nb2);   // 4D後進確率
+    // for(idx=0;   idx<Ns;idx++) CalcPDE4D(idx,Nb2);   // 4D事後確率
 
     for(idx=0;   idx<Ns;idx++) CalcPO(idx);
     DelFGE4D();  // 4D lattice memory deallocation
@@ -741,13 +792,13 @@ void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int
 }
 
 //================================================================================
-void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW){
+void SLFBAdec::Decode(double **Pout, const unsigned char *RW, int Nb2, const int *dbgIW, double sparse_threshold){
   double **Pin = new double * [Ns];
   for(int i=0;i<Ns;i++){
     Pin[i] = new double [Q];
     for(int x=0;x<Q;x++) Pin[i][x] = (double)1.0/Q;
   } // for i
-  Decode(Pout,RW,Nb2,dbgIW,(const double **)Pin);
+  Decode(Pout,RW,Nb2,dbgIW,(const double **)Pin, sparse_threshold);
   for(int i=0;i<Ns;i++) delete [] Pin[i];
   delete [] Pin;
 }
@@ -1286,11 +1337,11 @@ int SLFBAdec::ComputeExtendedKmer(int current_kmer, int xi_current,
   GetKmerFromIndex(current_kmer, kmer_seq);
   
   // 現在と次の符号語を取得
-    // 動的配列を使用
-  unsigned char *cw_current = new unsigned char[Nu];
-  unsigned char *cw_next = new unsigned char[Nu];
-  ICB->Get_CW(cw_current, xi_current);
-  ICB->Get_CW(cw_next, xi_next);
+  // 動的配列を使用
+  std::vector<unsigned char> cw_current(Nu);
+  std::vector<unsigned char> cw_next(Nu);
+  ICB->Get_CW(cw_current.data(), xi_current);
+  ICB->Get_CW(cw_next.data(), xi_next);
   
   // 論文の式に従い、k/v個の過去の符号語と現在・次の符号語を結合
   // ここでは簡略化のため、最新2つの符号語のみを使用
@@ -1898,7 +1949,7 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
                 // double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
 
                 // 改善: メモ化によるオンデマンド計算（メモリ効率版）
-                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
                 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
                 
                 // 次の符号語の事前確率も考慮
@@ -1958,13 +2009,15 @@ void SLFBAdec::CalcPFE4D(int idx, int Nb2) {
 //================================================================================
 void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
   assert(idx >= 0 && idx < Ns);
-  printf("# Dec3: CalcForwardMsg[%d] starting with k-marginalization...\n", idx);
+  printf("# Dec3: CalcForwardMsg[%d] with Beam Search (Width=%zu)...\n", idx, beam_width);
   fflush(stdout);
 
-  // 1. 次の時刻のメッセージを初期化
-  for (int d1 = Dmin; d1 <= Dmax; d1++) {
-    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
-      FwdMsg[idx + 1][d1 - Dmin][e1] = 0.0;
+  // ①-1. 次の時刻 t+1 の全状態の確率を一時的に計算・蓄積するための配列
+  std::vector<std::vector<double>> TempFwdMsg(Drng, std::vector<double>(NUM_ERROR_STATES, 0.0));
+  // double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  for (int d = 0; d < Drng; d++) {
+    for (int e = 0; e < NUM_ERROR_STATES; e++) {
+      TempFwdMsg[d][e] = 0.0;
     }
   }
 
@@ -2041,6 +2094,278 @@ void SLFBAdec::CalcForwardMsg(int idx, int Nb2) {
 }
 
 //================================================================================
+// 【ビームサーチ版】横方向前向きメッセージ計算
+// 計算量削減のため上位beam_width個の状態のみ保持
+//================================================================================
+void SLFBAdec::CalcForwardMsgBeam(int idx, int Nb2) {
+  assert(idx >= 0 && idx < Ns);
+  printf("# Dec3: CalcForwardMsgBeam[%d] with Beam Search (Width=%zu)...\n", idx, beam_width);
+  fflush(stdout);
+
+  // ①-1. 一時配列で全状態の確率を計算
+  // double TempFwdMsg[Drng][NUM_ERROR_STATES];
+  std::vector<std::vector<double>> TempFwdMsg(Drng, std::vector<double>(NUM_ERROR_STATES, 0.0));
+  for (int d = 0; d < Drng; d++) {
+    for (int e = 0; e < NUM_ERROR_STATES; e++) {
+      TempFwdMsg[d][e] = 0.0;
+    }
+  }
+
+  // 2. 【スパース遷移行列】高速化された遷移計算（修正版）
+  for (int d0 = Dmin; d0 <= Dmax; d0++) {
+    for (int e0 = 0; e0 < NUM_ERROR_STATES; e0++) {
+      if (FwdMsg[idx][d0 - Dmin][e0] == 0.0) continue;
+
+      for (int k0 = 0; k0 < num_kmers; k0++) {
+        // P(k₀|d₀,e₀)を考慮（現在は均等分布と仮定）
+        double p_k0 = 1.0 / num_kmers;
+
+        for (int xi = 0; xi < Q; xi++) {
+          for (int xi_next = 0; xi_next < Q; xi_next++) {
+
+            // 【動的枝刈り】高確率な遷移先のリストを動的に取得（計算orキャッシュ）
+            const auto& valid_transitions = GetValidTransitions(e0, k0, xi, xi_next, 1e-6);
+
+            // 取得したリストが空なら、この先の計算は不要
+            if (valid_transitions.empty()) continue;
+
+            // 【置換された計算】Q×Q×k ループ → 有効遷移のみをループ
+            for (const SparseTransitionInfo& trans : valid_transitions) {
+              int e1 = trans.next_e;
+              // int k1 = trans.next_k; // k1は後続処理で必要になった場合に使用
+
+              for (int d1 = Dmin; d1 <= Dmax; d1++) {
+                // 観測確率の計算
+                int Nu2 = Nu + d1 - d0;
+                int iL = idx * Nu + d0;
+                double obs_prob = ComputeExtendedObservationProbability(idx, Nu2, iL, xi, xi_next, k0, e0, Nb2);
+
+                // 事前確率の計算
+                double prior_prob = PU[idx][xi] * (idx + 1 < Ns ? PU[idx + 1][xi_next] : 1.0 / Q);
+
+                // 全確率の計算（事前計算済み遷移確率を使用）
+                double prob_component = obs_prob * prior_prob * trans.prob * p_k0;
+
+                // 結果に累積
+                TempFwdMsg[d1 - Dmin][e1] += FwdMsg[idx][d0 - Dmin][e0] * prob_component;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ②ビームサーチ: 上位beam_width個の状態のみ保持
+  std::vector<StateInfo> next_states;
+  for (int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      if (TempFwdMsg[d1 - Dmin][e1] > 0) {
+        next_states.push_back({d1, e1, TempFwdMsg[d1 - Dmin][e1]});
+      }
+    }
+  }
+
+  std::sort(next_states.begin(), next_states.end());
+  if (next_states.size() > beam_width) {
+    next_states.resize(beam_width);
+  }
+
+  // ③次の時刻のメッセージ配列に書き戻し
+  for(int d1 = Dmin; d1 <= Dmax; d1++) {
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+      FwdMsg[idx + 1][d1 - Dmin][e1] = 0.0;
+    }
+  }
+
+  for (const auto& state : next_states) {
+    FwdMsg[idx + 1][state.d - Dmin][state.e] = state.prob;
+  }
+
+  // 正規化
+  double total_sum = 0.0;
+  for (const auto& state : next_states) {
+    total_sum += state.prob;
+  }
+
+  if(total_sum > 1e-15) {
+    for (const auto& state : next_states) {
+      FwdMsg[idx + 1][state.d - Dmin][state.e] /= total_sum;
+    }
+  }
+
+  printf("# Dec3: CalcForwardMsgBeam[%d] completed | beam_states=%lu/%zu\n",
+         idx, next_states.size(), beam_width);
+}
+
+//================================================================================
+// 【スパース遷移行列】静的枝刈りによる事前計算（修正版）
+// 純粋な遷移確率 P(e₁|e₀,k₀,xi,xi_next) の枝刈りに専念
+// 計算量を現実的なレベルに削減: O(E²·K·Q²) ≈ 4²·256·1152² ≈ 3.4×10⁹
+//================================================================================
+
+//================================================================================
+// 【新核心関数】動的な枝刈りを伴うメモ化
+// (e₀,k₀,xi,xi_next)から始まる高確率な遷移リストを動的に計算・キャッシュする
+//================================================================================
+const std::vector<SLFBAdec::SparseTransitionInfo>& SLFBAdec::GetValidTransitions(int e0, int k0, int xi, int xi_next, double threshold) {
+    auto key = std::make_tuple(e0, k0, xi, xi_next);
+
+    // 1. まずキャッシュにキーが存在するか確認
+    auto it = sparse_transition_cache.find(key);
+    if (it != sparse_transition_cache.end()) {
+        // あればキャッシュからリストを返す
+        return it->second;
+    }
+
+    // 2. キャッシュにない場合、その場で計算してリストを作成
+    std::vector<SparseTransitionInfo> valid_transitions;
+    for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
+        // GetExtendedKmerErrorProb は内部でk₁を計算し、基本的なエラー確率を返す
+        double trans_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
+
+        // 【動的枝刈り】計算した確率が閾値以上か判定
+        if (trans_prob >= threshold) {
+            int k1 = ComputeExtendedKmer(k0, xi, xi_next, 0);
+            valid_transitions.push_back({e1, k1, trans_prob});
+        }
+    }
+
+    // 3. 計算結果（空かもしれないリスト）をキャッシュに保存して、その参照を返す
+    sparse_transition_cache[key] = valid_transitions;
+    return sparse_transition_cache[key];
+}
+
+// in SLFBAdec.cpp
+
+//================================================================================
+// 【デバッグ用】スパース遷移行列の内容をファイルに出力
+//================================================================================
+void SLFBAdec::ExportSparseTransitions(const char* filename) const {
+    printf("# Exporting dynamic sparse transition cache to %s ...\n", filename);
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        printf("# Error: Cannot open file %s for writing.\n", filename);
+        return;
+    }
+
+    fprintf(file, "# Dynamic Sparse Transition Cache\n");
+    fprintf(file, "# Total cached transition patterns: %zu\n", sparse_transition_cache.size());
+    fprintf(file, "# Format: (e0, k0, xi, xi_next) -> [next_e, next_k, probability]\n\n");
+
+    for (const auto& kv : sparse_transition_cache) {
+        const auto& key = kv.first;
+        const auto& transitions = kv.second;
+
+        // 遷移元のキーを出力
+        fprintf(file, "(e₀=%d, k₀=%d, xi=%d, xi_next=%d) -> %zu transitions\n",
+                std::get<0>(key), std::get<1>(key), std::get<2>(key), std::get<3>(key),
+                transitions.size());
+
+        // 遷移先のリストを出力
+        for (const auto& trans : transitions) {
+            fprintf(file, "  -> (e₁=%d, k₁=%d) | prob=%.6e\n",
+                    trans.next_e, trans.next_k, trans.prob);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+    printf("# Export complete.\n");
+}
+
+//================================================================================
+// 【キャッシュ機能】スパース遷移行列をファイルに保存
+//================================================================================
+void SLFBAdec::SaveSparseTransitions(const char* filename) const {
+  printf("# Dynamic computation mode: Cache saving not needed (dynamic memoization is used)\n");
+  printf("# Cache file %s not created - using on-demand computation with memory cache\n", filename);
+}
+
+//================================================================================
+// 【キャッシュ機能】ファイルからスパース遷移行列を読み込む
+//================================================================================
+bool SLFBAdec::LoadSparseTransitions(const char* filename) {
+  printf("# Dynamic computation mode: No cache loading needed\n");
+  printf("# Cache file %s ignored - using dynamic computation with memoization\n", filename);
+  return false; // Always return false to trigger dynamic computation
+}
+
+//================================================================================
+// 【監視システム】リアルタイムキャッシュ監視の開始
+//================================================================================
+void SLFBAdec::StartCacheMonitoring(const char* snapshot_filename, int interval_seconds) {
+  if (monitoring_active) {
+    printf("# Warning: Cache monitoring is already active.\n");
+    return;
+  }
+
+  monitoring_active = true;
+  printf("# Starting cache monitoring: %s (every %d seconds)\n", snapshot_filename, interval_seconds);
+
+  // 監視スレッドを起動
+  monitoring_thread = std::thread([this, snapshot_filename, interval_seconds]() {
+    while (monitoring_active) {
+      std::this_thread::sleep_for(std::chrono::seconds(interval_seconds));
+
+      if (!monitoring_active) break; // 終了チェック
+
+      // スナップショットを出力
+      {
+        std::lock_guard<std::mutex> lock(cache_mutex);
+
+        FILE* file = fopen(snapshot_filename, "w");
+        if (file) {
+          // 現在時刻を取得
+          auto now = std::chrono::system_clock::now();
+          auto time_t = std::chrono::system_clock::to_time_t(now);
+
+          fprintf(file, "# Cache snapshot at: %s", ctime(&time_t));
+          fprintf(file, "# Total cached entries: %zu\n", transition_prob_cache.size());
+          fprintf(file, "# Format: e0, k0, xi, xi_next, e1, probability\n\n");
+
+          // キャッシュの内容を出力（上位100件程度に制限）
+          int count = 0;
+          for (const auto& kv : transition_prob_cache) {
+            if (count >= 100) {
+              fprintf(file, "# ... (%zu more entries)\n", transition_prob_cache.size() - 100);
+              break;
+            }
+
+            const auto& key = kv.first;
+            fprintf(file, "%d, %d, %d, %d, %d, %.8e\n",
+                    std::get<0>(key), std::get<1>(key), std::get<2>(key),
+                    std::get<3>(key), std::get<4>(key), kv.second);
+            count++;
+          }
+
+          fclose(file);
+        }
+      }
+    }
+  });
+}
+
+//================================================================================
+// 【監視システム】リアルタイムキャッシュ監視の停止
+//================================================================================
+void SLFBAdec::StopCacheMonitoring() {
+  if (!monitoring_active) {
+    return; // 既に停止済み
+  }
+
+  printf("# Stopping cache monitoring...\n");
+  monitoring_active = false;
+
+  // スレッドが終了するのを待つ
+  if (monitoring_thread.joinable()) {
+    monitoring_thread.join();
+  }
+
+  printf("# Cache monitoring stopped.\n");
+}
+
+//================================================================================
 // 【核心】4次元後進確率計算 - 前進後進アルゴリズムの後進ステップ
 // 逆方向に状態確率を伝播: P_B(d_t, e_t, η_t) = Σ P_B(d_{t+1}, e_{t+1}, η_{t+1}) × 遷移確率
 // 時刻を逆行して最適な復号確率を計算
@@ -2088,7 +2413,7 @@ void SLFBAdec::CalcPBE4D(int idx, int Nb2) {
                 if (PBE4D[idx+1][d1-Dmin][e1][k1] == 0.0) continue;
 
                 // ▼▼▼【計算量爆発解決】正しい(xi, xi_next)ペアでルックアップ▼▼▼
-                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
                 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 // 次の符号語の事前確率も考慮（CalcPFE4Dと同じ）
@@ -2262,7 +2587,7 @@ void SLFBAdec::CalcPDE4D(int idx, int Nb2) {
 
               for (int e1 = 0; e1 < NUM_ERROR_STATES; e1++) {
                 // ▼▼▼【計算量爆発解決】事前計算テーブル使用▼▼▼
-                double kmer_error_prob = GetOrComputeTransitionProb(e0, k0, xi, xi_next, e1);
+                double kmer_error_prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
                 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
                 // 事後確率の正確な計算（次の符号語の事前確率も考慮）
@@ -2372,36 +2697,15 @@ void SLFBAdec::CalcPosterior(int idx, int Nb2) {
 // オンデマンドで確率を計算し、結果をキャッシュして再利用
 // P(e1|e0, k0, xi, xi_next) の計算とメモ化
 //================================================================================
-double SLFBAdec::GetOrComputeTransitionProb(int e0, int k0, int xi, int xi_next, int e1) {
-  assert(e0 >= 0 && e0 < NUM_ERROR_STATES);
-  assert(k0 >= 0 && k0 < num_kmers);
-  assert(xi >= 0 && xi < Q);
-  assert(xi_next >= 0 && xi_next < Q);
-  assert(e1 >= 0 && e1 < NUM_ERROR_STATES);
-
-  // キャッシュキーを作成
-  std::tuple<int, int, int, int, int> key = std::make_tuple(e0, k0, xi, xi_next, e1);
-
-  // キャッシュに存在するかチェック
-  auto it = transition_prob_cache.find(key);
-  if (it != transition_prob_cache.end()) {
-    // キャッシュヒット：既に計算済み
-    return it->second;
-  }
-
-  // キャッシュミス：新規計算が必要
-  double prob = GetExtendedKmerErrorProb(e0, k0, xi, xi_next, e1);
-
-  // 計算結果をキャッシュに保存
-  transition_prob_cache[key] = prob;
-
-  return prob;
-}
+// GetOrComputeTransitionProb function removed - using dynamic GetValidTransitions instead
 
 //================================================================================
 // メモ化キャッシュのクリア（メモリ解放）
 //================================================================================
 void SLFBAdec::ClearTransitionProbCache() {
+  // 【Mutex保護】キャッシュアクセスを排他制御
+  std::lock_guard<std::mutex> lock(cache_mutex);
+
   size_t cache_size = transition_prob_cache.size();
   transition_prob_cache.clear();
   printf("# Dec3: Transition probability cache cleared (%zu entries freed)\n", cache_size);
@@ -2412,6 +2716,9 @@ void SLFBAdec::ClearTransitionProbCache() {
 // 実際に使用された遷移確率のみを出力（メモリ効率的）
 //================================================================================
 void SLFBAdec::ExportTransitionProbCache(const char* filename) const {
+  // 【Mutex保護】キャッシュアクセスを排他制御
+  std::lock_guard<std::mutex> lock(cache_mutex);
+
   printf("# Dec3: メモ化キャッシュを %s に出力中...\n", filename);
 
   FILE* file = fopen(filename, "w");
